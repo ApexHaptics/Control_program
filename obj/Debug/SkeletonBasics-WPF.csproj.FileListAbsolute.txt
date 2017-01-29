@@ -1,0 +1,16 @@
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\SkeletonBasics-WPF.exe
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\SkeletonBasics-WPF.pdb
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\Microsoft.Kinect.dll
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\Microsoft.Kinect.xml
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF.csprojResolveAssemblyReference.cache
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\MainWindow.baml
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\MainWindow.g.cs
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\App.g.cs
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF_MarkupCompile.cache
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF.g.resources
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\Microsoft.Samples.Kinect.SkeletonBasics.Properties.Resources.resources
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF.csproj.GenerateResource.Cache
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF.exe
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\obj\Debug\SkeletonBasics-WPF.pdb
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\InTheHand.Net.Personal.dll
+C:\Users\jaden\Documents\FYDP\Kinect WPF\SkeletonBasics-WPF\bin\Debug\InTheHand.Net.Personal.xml
