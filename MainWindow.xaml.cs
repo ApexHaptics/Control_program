@@ -10,7 +10,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
     using System.Windows;
     using System.Windows.Media;
     using Microsoft.Kinect;
-    
+    using System.Linq;
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -233,27 +233,28 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                 if (skeletons.Length != 0)
                 {
-                    if (skeletons[0].TrackingState == SkeletonTrackingState.Tracked)
+                    var skeletonToSend = skeletons.Where(skeleton => skeleton.TrackingState == SkeletonTrackingState.Tracked).Select(skeleton => skeleton).FirstOrDefault();
+                    if (skeletonToSend != null)
                     {
                         // Send the hand joint information over bluetooth
-                        bluetoothService.Send("HD_X," + skeletons[0].Joints[JointType.Head].Position.X + "," +
-                                              "HD_Y," + skeletons[0].Joints[JointType.Head].Position.Y + "," +
-                                              "HD_Z," + skeletons[0].Joints[JointType.Head].Position.Z + "," +
-                                              "SC_X," + skeletons[0].Joints[JointType.ShoulderCenter].Position.X + "," +
-                                              "SC_Y," + skeletons[0].Joints[JointType.ShoulderCenter].Position.Y + "," +
-                                              "SC_Z," + skeletons[0].Joints[JointType.ShoulderCenter].Position.Z + "," +
-                                              "WR_X," + skeletons[0].Joints[JointType.WristRight].Position.X + "," +
-                                              "WR_Y," + skeletons[0].Joints[JointType.WristRight].Position.Y + "," +
-                                              "WR_Z," + skeletons[0].Joints[JointType.WristRight].Position.Z + "," +
-                                              "HR_X," + skeletons[0].Joints[JointType.HandRight].Position.X + "," +
-                                              "HR_Y," + skeletons[0].Joints[JointType.HandRight].Position.Y + "," +
-                                              "HR_Z," + skeletons[0].Joints[JointType.HandRight].Position.Z + "," +
-                                              "WL_X," + skeletons[0].Joints[JointType.WristLeft].Position.X + "," +
-                                              "WL_Y," + skeletons[0].Joints[JointType.WristLeft].Position.Y + "," +
-                                              "WL_Z," + skeletons[0].Joints[JointType.WristLeft].Position.Z + "," +
-                                              "HL_X," + skeletons[0].Joints[JointType.HandLeft].Position.X + "," +
-                                              "HL_Y," + skeletons[0].Joints[JointType.HandLeft].Position.Y + "," +
-                                              "HL_Z," + skeletons[0].Joints[JointType.HandLeft].Position.Z + ",");
+                        bluetoothService.Send("HD_X," + skeletonToSend.Joints[JointType.Head].Position.X + "," +
+                                              "HD_Y," + skeletonToSend.Joints[JointType.Head].Position.Y + "," +
+                                              "HD_Z," + skeletonToSend.Joints[JointType.Head].Position.Z + "," +
+                                              "SC_X," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.X + "," +
+                                              "SC_Y," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.Y + "," +
+                                              "SC_Z," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.Z + "," +
+                                              "WR_X," + skeletonToSend.Joints[JointType.WristRight].Position.X + "," +
+                                              "WR_Y," + skeletonToSend.Joints[JointType.WristRight].Position.Y + "," +
+                                              "WR_Z," + skeletonToSend.Joints[JointType.WristRight].Position.Z + "," +
+                                              "HR_X," + skeletonToSend.Joints[JointType.HandRight].Position.X + "," +
+                                              "HR_Y," + skeletonToSend.Joints[JointType.HandRight].Position.Y + "," +
+                                              "HR_Z," + skeletonToSend.Joints[JointType.HandRight].Position.Z + "," +
+                                              "WL_X," + skeletonToSend.Joints[JointType.WristLeft].Position.X + "," +
+                                              "WL_Y," + skeletonToSend.Joints[JointType.WristLeft].Position.Y + "," +
+                                              "WL_Z," + skeletonToSend.Joints[JointType.WristLeft].Position.Z + "," +
+                                              "HL_X," + skeletonToSend.Joints[JointType.HandLeft].Position.X + "," +
+                                              "HL_Y," + skeletonToSend.Joints[JointType.HandLeft].Position.Y + "," +
+                                              "HL_Z," + skeletonToSend.Joints[JointType.HandLeft].Position.Z + ",");
                     }
 
                     foreach (Skeleton skel in skeletons)
