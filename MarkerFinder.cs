@@ -43,24 +43,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private DrawingGroup drawingGroup;
 
         /// <summary>
-        /// Translates an image point to XYZ through the Kinect API
-        /// </summary>
-        private CoordinateMapper coordinateMapper;
-
-        /// <summary>
         /// The dictionary used to detect markers
         /// </summary>
         private readonly Dictionary dictionary = new Dictionary(Dictionary.PredefinedDictionaryName.Dict5X5_100);
-
-        /// <summary>
-        /// The depthPixels to be assigned by coordinateMapper
-        /// </summary>
-        private DepthImagePixel[] depthPixels = new DepthImagePixel[cImgWidth * cImgHeight];
-
-        /// <summary>
-        /// The depthPoints to be assigned by coordinateMapper
-        /// </summary>
-        private DepthImagePoint[] depthPoints = new DepthImagePoint[cImgWidth * cImgHeight];
 
         /// <summary>
         /// Brush used to draw marker center point
@@ -76,11 +61,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Constructor for the SkeletonRender class
         /// </summary>
         /// <param name="drawingGroup">Where the skeleton will be drawn onto</param>
-        /// <param name="coordinateMapper">The CoordinateMapper to translate an image point to XYZ</param>
-        public MarkerFinder(DrawingGroup drawingGroup, CoordinateMapper coordinateMapper)
+        public MarkerFinder(DrawingGroup drawingGroup)
         {
             this.drawingGroup = drawingGroup;
-            this.coordinateMapper = coordinateMapper;
 
             // This code generates a test marker. Uncomment to generate a new one
             //Mat markerImage = new Mat();
@@ -102,7 +85,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             using (ColorImageFrame frame = e.OpenColorImageFrame())
             {
                 if (frame == null) return null;
-                coordinateMapper.MapColorFrameToDepthFrame(frame.Format, DepthImageFormat.Resolution640x480Fps30, depthPixels, depthPoints);
 
                 DetectorParameters p = DetectorParameters.GetDefault();
                 Bitmap frameBitmap = ImageToBitmap(frame);
@@ -117,21 +99,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
                     foreach (PointF[] markerArray in outArray)
                     {
+                        // Undo mirroring
+                        markerArray[0].X = cImgWidth - markerArray[0].X;
+                        markerArray[1].X = cImgWidth - markerArray[0].X;
+                        markerArray[2].X = cImgWidth - markerArray[0].X;
+                        markerArray[3].X = cImgWidth - markerArray[0].X;
+
                         // Find the center
                         PointF center = new PointF((markerArray[0].X + markerArray[1].X + markerArray[2].X + markerArray[3].X)/4,
                             (markerArray[0].Y + markerArray[1].Y + markerArray[2].Y + markerArray[3].Y) / 4);
-
-                        // Convert to depth
-                        int colorX = cImgWidth - (int)center.X; // Undo mirroring
-                        int colorY = (int)center.Y;
-
-                        DepthImagePoint depthPoint = depthPoints[cImgWidth * colorY + colorX];
-                        // For some reason this doesn't work. Both depth->color and color->depth mappings return 0 as point locations...
+                        
+                        System.Windows.Point centerPoint = new System.Windows.Point((int)center.X, (int)center.Y);
 
                         dc.DrawEllipse(
                             this.centerPointBrush,
                             null,
-                            new System.Windows.Point(colorX, colorY),
+                            centerPoint,
                             MarkerCenterThickness,
                             MarkerCenterThickness);
                     }

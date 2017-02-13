@@ -40,6 +40,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private MarkerFinder finder;
 
         /// <summary>
+        /// The last recorded mapping from colour space to skeleton space
+        /// </summary>
+        private SkeletonPoint[] lastSkeletonMapping = new SkeletonPoint[640 * 480];
+
+        /// <summary>
         /// Initializes a new instance of the MainWindow class.
         /// </summary>
         public MainWindow()
@@ -86,7 +91,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (null != this.sensor)
             {
                 this.renderer = new SkeletonRenderer(drawingGroup, this.sensor.CoordinateMapper);
-                this.finder = new MarkerFinder(markerDrawingGroup, this.sensor.CoordinateMapper);
+                this.finder = new MarkerFinder(markerDrawingGroup);
 
                 // Turn on the skeleton stream to receive skeleton frames
                 this.sensor.SkeletonStream.Enable();
@@ -98,7 +103,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 this.sensor.ColorStream.Enable();
                 this.sensor.ColorFrameReady += this.ColorFrameReady;
 
+                // Enable the depth camera to find the depth of each marker
                 this.sensor.DepthStream.Enable();
+                this.sensor.DepthFrameReady += this.DepthFrameReady;
 
                 // Start the sensor!
                 try
@@ -114,6 +121,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (null == this.sensor)
             {
                 this.statusBarText.Text = Properties.Resources.NoKinectReady;
+            }
+        }
+
+        /// <summary>
+        /// A method to handle a new depth frame. Saves the mapping
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void DepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
+        {
+            using (DepthImageFrame frame = e.OpenDepthImageFrame())
+            {
+                if (frame == null) return;
+                DepthImagePixel[] pixelData = new DepthImagePixel[frame.Width * frame.Height];
+                frame.CopyDepthImagePixelDataTo(pixelData);
+                this.sensor.CoordinateMapper.MapColorFrameToSkeletonFrame(sensor.ColorStream.Format, DepthImageFormat.Resolution640x480Fps30, pixelData, lastSkeletonMapping);
             }
         }
 
