@@ -11,6 +11,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
     using System.Windows.Media;
     using Microsoft.Kinect;
     using System.Linq;
+    using System;
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -22,11 +24,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private KinectSensor sensor;
 
         /// <summary>
-        /// Drawing image that we will display
-        /// </summary>
-        private DrawingImage imageSource;
-
-        /// <summary>
         /// The instance of bluetoothService used for all Bluetooth calls
         /// </summary>
         private BluetoothService bluetoothService;
@@ -36,6 +33,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Code mostly taken from the sample
         /// </summary>
         private SkeletonRenderer renderer;
+
+        /// <summary>
+        /// Finds the marker locations given the colour image data
+        /// </summary>
+        private MarkerFinder finder;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -58,12 +60,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             // Create the drawing group we'll use for drawing
             DrawingGroup drawingGroup = new DrawingGroup();
+            DrawingGroup markerDrawingGroup = new DrawingGroup();
 
-            // Create an image source that we can use in our image control
-            this.imageSource = new DrawingImage(drawingGroup);
+            // Create image sources that we can use in our image controls
+            ImageSource imageSource = new DrawingImage(drawingGroup);
+            ImageSource markerSource = new DrawingImage(markerDrawingGroup);
 
-            // Display the drawing using our image control
-            Image.Source = this.imageSource;
+            // Display the drawing using our image controls
+            Image.Source = imageSource;
+            MarkerOverlay.Source = markerSource;
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
@@ -81,15 +86,19 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (null != this.sensor)
             {
                 this.renderer = new SkeletonRenderer(drawingGroup, this.sensor.CoordinateMapper);
+                this.finder = new MarkerFinder(markerDrawingGroup, this.sensor.CoordinateMapper);
 
                 // Turn on the skeleton stream to receive skeleton frames
                 this.sensor.SkeletonStream.Enable();
 
-                // For debug: show camera
-                this.sensor.ColorStream.Enable();
-
                 // Add an event handler to be called whenever there is new color frame data
                 this.sensor.SkeletonFrameReady += this.renderer.SensorSkeletonFrameReady;
+
+                // Enable the camera to track the markers
+                this.sensor.ColorStream.Enable();
+                this.sensor.ColorFrameReady += this.ColorFrameReady;
+
+                this.sensor.DepthStream.Enable();
 
                 // Start the sensor!
                 try
@@ -106,6 +115,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 this.statusBarText.Text = Properties.Resources.NoKinectReady;
             }
+        }
+
+        /// <summary>
+        /// A method to handle a new color frame. Extracts marker locations
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
+        {
+            finder.FindMarkers(e);
+            // Method should eventually return data to send
         }
 
         /// <summary>
@@ -129,6 +149,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (skeletonToSend != null)
             {
                 // Send the hand joint information over bluetooth. This protocol nees to be reworked
+                // Also these are in skeleton space. They need to be in depth space
                 bluetoothService.Send("HD_X," + skeletonToSend.Joints[JointType.Head].Position.X + "," +
                                         "HD_Y," + skeletonToSend.Joints[JointType.Head].Position.Y + "," +
                                         "HD_Z," + skeletonToSend.Joints[JointType.Head].Position.Z + "," +

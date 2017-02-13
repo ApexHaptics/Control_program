@@ -66,8 +66,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>        
         private readonly Pen inferredBonePen = new Pen(Brushes.Gray, 1);
 
-        CoordinateMapper coordinateMapper;
+        /// <summary>
+        /// Translates an image point to XYZ through the Kinect API
+        /// </summary>
+        private CoordinateMapper coordinateMapper;
 
+        /// <summary>
+        /// Constructor for the SkeletonRender class
+        /// </summary>
+        /// <param name="drawingGroup">Where the skeleton will be drawn onto</param>
+        /// <param name="coordinateMapper">The CoordinateMapper to translate an image point to XYZ</param>
         public SkeletonRenderer(DrawingGroup drawingGroup, CoordinateMapper coordinateMapper)
         {
             this.drawingGroup = drawingGroup;
