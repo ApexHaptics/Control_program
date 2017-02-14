@@ -50,12 +50,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Brush used to draw marker center point
         /// </summary>
-        private readonly System.Windows.Media.Brush centerPointBrush = System.Windows.Media.Brushes.Blue;
+        private readonly System.Windows.Media.Brush[] cornerBrushes = { System.Windows.Media.Brushes.Blue,
+            System.Windows.Media.Brushes.Red,
+            System.Windows.Media.Brushes.Yellow,
+            System.Windows.Media.Brushes.Green };
 
         /// <summary>
         /// Thickness of marker center ellipse
         /// </summary>
-        private const double MarkerCenterThickness = 10;
+        private const double CornerThickness = 5;
 
         /// <summary>
         /// Constructor for the SkeletonRender class
@@ -99,27 +102,23 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
                     foreach (PointF[] markerArray in outArray)
                     {
-                        // Undo mirroring
-                        markerArray[0].X = cImgWidth - markerArray[0].X;
-                        markerArray[1].X = cImgWidth - markerArray[0].X;
-                        markerArray[2].X = cImgWidth - markerArray[0].X;
-                        markerArray[3].X = cImgWidth - markerArray[0].X;
+                        for(int i = 0; i < markerArray.Length; i++)
+                        {
+                            // Undo mirroring
+                            markerArray[i].X = cImgWidth - markerArray[i].X;
 
-                        // Find the center
-                        PointF center = new PointF((markerArray[0].X + markerArray[1].X + markerArray[2].X + markerArray[3].X)/4,
-                            (markerArray[0].Y + markerArray[1].Y + markerArray[2].Y + markerArray[3].Y) / 4);
-                        
-                        System.Windows.Point centerPoint = new System.Windows.Point((int)center.X, (int)center.Y);
-
-                        dc.DrawEllipse(
-                            this.centerPointBrush,
-                            null,
-                            centerPoint,
-                            MarkerCenterThickness,
-                            MarkerCenterThickness);
+                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[i].X, (int)markerArray[i].Y);
+                            dc.DrawEllipse(
+                                this.cornerBrushes[i],
+                                null,
+                                cornerPoint,
+                                CornerThickness,
+                                CornerThickness);
+                        }
                     }
                 }
 
+                //TODO: Return the id array as well
                 return outArray;
             }
         }
