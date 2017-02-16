@@ -68,19 +68,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             this.drawingGroup = drawingGroup;
 
-            // This code generates a test marker. Uncomment to generate a new one
-            //Mat markerImage = new Mat();
-            //int markerId = 50;
-            //ArucoInvoke.DrawMarker(dictionary, markerId, 200, markerImage);
-            //markerImage.Save("Test.png");
+            // This code generates all the test markers. Uncomment to generate
+            //for (int i = 0; i < 100; i++)
+            //{
+            //    Mat markerImage = new Mat();
+            //    ArucoInvoke.DrawMarker(dictionary, i, 200, markerImage);
+            //    markerImage.Save("Marker" + i + ".png");
+            //}
         }
 
         /// <summary>
         /// A method to handle a new color frame. Returns marker locations
         /// </summary>
         /// <param name="sender">object sending the event</param>
+        /// <param name="idList">a list to be populated with the marker ids placed in the return</param>
         /// <returns>The array of points detected in the image</returns>
-        public PointF[][] FindMarkers(ColorImageFrameReadyEventArgs e)
+        public PointF[][] FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList)
         {
             using (VectorOfInt ids = new VectorOfInt())
             using (VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF())
@@ -95,8 +98,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 Image<Bgr, byte> imageFromKinect = new Image<Bgr, byte>(frameBitmap);
 
                 ArucoInvoke.DetectMarkers(imageFromKinect, dictionary, corners, ids, p, rejected);
-                PointF[][] outArray = corners.ToArrayOfArray();
 
+                // Populate the marker ids
+                for (int i = 0; i < ids.Size; i++)
+                {
+                    idList.Add(ids[i]);
+                }
+                
+                // Draw the markers
+                PointF[][] outArray = corners.ToArrayOfArray();
                 using (DrawingContext dc = this.drawingGroup.Open())
                 {
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
@@ -117,8 +127,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         }
                     }
                 }
-
-                //TODO: Return the id array as well
+                
                 return outArray;
             }
         }

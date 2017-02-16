@@ -214,7 +214,7 @@
         {
             if (_connWtr == null)
             {
-                System.Windows.MessageBox.Show("No connection.");
+                Debug.WriteLine("SEND_MSG:" + message);
                 return false;
             }
             try

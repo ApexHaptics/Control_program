@@ -85,21 +85,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Event handler for Kinect sensor's SkeletonFrameReady event
         /// </summary>
-        /// <param name="sender">object sending the event</param>
-        /// <param name="e">event arguments</param>
-        public void SensorSkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
+        /// <param name="skeletons">The skeleton(s) to be redered</param>
+        public void RenderSkeletons(Skeleton[] skeletons)
         {
-            Skeleton[] skeletons = new Skeleton[0];
-
-            using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
-            {
-                if (skeletonFrame != null)
-                {
-                    skeletons = new Skeleton[skeletonFrame.SkeletonArrayLength];
-                    skeletonFrame.CopySkeletonDataTo(skeletons);
-                }
-            }
-
             using (DrawingContext dc = this.drawingGroup.Open())
             {
                 // Draw a transparent background to set the render size

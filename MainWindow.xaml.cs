@@ -102,7 +102,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 this.sensor.SkeletonStream.Enable();
 
                 // Add an event handler to be called whenever there is new color frame data
-                this.sensor.SkeletonFrameReady += this.renderer.SensorSkeletonFrameReady;
+                this.sensor.SkeletonFrameReady += this.SensorSkeletonFrameReady;
 
                 // Enable the camera to track the markers
                 this.sensor.ColorStream.Enable();
@@ -153,15 +153,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="e">event arguments</param>
         private void ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
         {
-            PointF[][] markerArray = finder.FindMarkers(e);
+            System.Collections.Generic.List<int> idList = new System.Collections.Generic.List<int>();
+            PointF[][] markerArray = finder.FindMarkers(e, idList);
 
             if (markerArray == null || markerArray.Length == 0 || skeletonMapped == false) return;
 
             string stringToSend = "MLoc,";
             
             // Important to note is that marker vertices are counterclockwise starting from top left
-            foreach (PointF[] marker in markerArray)
+            for (int i = 0; i < markerArray.Length; i++)
             {
+                PointF[] marker = markerArray[i];
+
                 // Find center before converting to skeleton space. Lag between color
                 // frames and depth frames could cause problems as seen in Kinect Studio
                 // Using https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line
@@ -181,7 +184,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 // If the center point is at 0, the depth sensor couldn't map it and nothing can be used
                 if (centerPoint.Z == 0) continue;
                 // TODO: Each marker should have an ID when sent
-                stringToSend = stringToSend + "MKR:" + centerPoint.X + "," + centerPoint.Y + "," + centerPoint.Z + ",";
+                stringToSend = stringToSend + "MKR," + idList[i] + "," + centerPoint.X + "," + centerPoint.Y + "," + centerPoint.Z + ",";
 
                 // If any other points are at 0, we can't calculate the normal
                 if (point0.Z == 0 || point1.Z == 0 || point2.Z == 0 || point3.Z == 0) return;
@@ -202,9 +205,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 normal.Y = (u.Z * v.X) - (u.X * v.Z);
                 normal.Z = (u.X * v.Y) - (u.Y * v.X);
 
-                stringToSend = stringToSend + "NML:" + normal.X + "," + normal.Y + "," + normal.Z + ",";
+                stringToSend = stringToSend + "NML," + normal.X + "," + normal.Y + "," + normal.Z + ",";
             }
-            System.Diagnostics.Debug.Write("Send:" + stringToSend + "\n");
+            bluetoothService.Send(stringToSend);
         }
 
         /// <summary>
@@ -227,28 +230,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             var skeletonToSend = skeletons.Where(skeleton => skeleton.TrackingState == SkeletonTrackingState.Tracked).Select(skeleton => skeleton).FirstOrDefault();
             if (skeletonToSend != null)
             {
-                // Send the hand joint information over bluetooth. This protocol needs to be reworked
-                bluetoothService.Send("HD_X," + skeletonToSend.Joints[JointType.Head].Position.X + "," +
-                                        "HD_Y," + skeletonToSend.Joints[JointType.Head].Position.Y + "," +
-                                        "HD_Z," + skeletonToSend.Joints[JointType.Head].Position.Z + "," +
-                                        "SC_X," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.X + "," +
-                                        "SC_Y," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.Y + "," +
-                                        "SC_Z," + skeletonToSend.Joints[JointType.ShoulderCenter].Position.Z + "," +
-                                        "WR_X," + skeletonToSend.Joints[JointType.WristRight].Position.X + "," +
-                                        "WR_Y," + skeletonToSend.Joints[JointType.WristRight].Position.Y + "," +
-                                        "WR_Z," + skeletonToSend.Joints[JointType.WristRight].Position.Z + "," +
-                                        "HR_X," + skeletonToSend.Joints[JointType.HandRight].Position.X + "," +
-                                        "HR_Y," + skeletonToSend.Joints[JointType.HandRight].Position.Y + "," +
-                                        "HR_Z," + skeletonToSend.Joints[JointType.HandRight].Position.Z + "," +
-                                        "WL_X," + skeletonToSend.Joints[JointType.WristLeft].Position.X + "," +
-                                        "WL_Y," + skeletonToSend.Joints[JointType.WristLeft].Position.Y + "," +
-                                        "WL_Z," + skeletonToSend.Joints[JointType.WristLeft].Position.Z + "," +
-                                        "HL_X," + skeletonToSend.Joints[JointType.HandLeft].Position.X + "," +
-                                        "HL_Y," + skeletonToSend.Joints[JointType.HandLeft].Position.Y + "," +
-                                        "HL_Z," + skeletonToSend.Joints[JointType.HandLeft].Position.Z + ",");
+                string stringToSend = "JLoc,";
+
+                // Order: SC, HD, WL, HL, WR, HR
+                foreach (Joint joint in skeletonToSend.Joints)
+                {
+                    stringToSend = stringToSend + "JNT," +
+                        (int)joint.JointType + "," +
+                        (int)joint.TrackingState + "," +
+                        joint.Position.X + "," +
+                        joint.Position.Y + "," +
+                        joint.Position.Z + ",";
+                }
+                bluetoothService.Send(stringToSend);
             }
 
-            this.renderer.SensorSkeletonFrameReady(sender, e);
+            this.renderer.RenderSkeletons(skeletons);
         }
 
         /// <summary>
