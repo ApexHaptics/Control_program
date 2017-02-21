@@ -40,6 +40,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private MarkerFinder finder;
 
         /// <summary>
+        /// The class for communicating with the Atmel board
+        /// </summary>
+        private SerialComms comms;
+
+        /// <summary>
         /// The last recorded mapping from colour space to skeleton space
         /// </summary>
         private SkeletonPoint[] lastSkeletonMapping = new SkeletonPoint[640 * 480];
@@ -79,6 +84,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             // Display the drawing using our image controls
             Image.Source = imageSource;
             MarkerOverlay.Source = markerSource;
+
+            // Start up comms
+            comms = new SerialComms();
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
