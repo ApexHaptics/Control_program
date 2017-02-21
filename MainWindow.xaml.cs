@@ -267,6 +267,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 this.sensor.Stop();
             }
+            if (null != this.comms)
+            {
+                this.comms.Stop();
+            }
         }
 
         /// <summary>
@@ -286,6 +290,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     this.sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Default;
                 }
+            }
+        }
+
+        private void SerialCommandBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Return)
+            {
+                if (String.IsNullOrEmpty(SerialCommandBox.Text)) return;
+                comms.HandleCommand(SerialCommandBox.Text);
+                SerialCommandBox.Text = "";
             }
         }
     }
