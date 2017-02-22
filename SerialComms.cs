@@ -41,7 +41,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The packets which are yet unsent
         /// </summary>
-        BlockingCollection<String> unsentStrings = new BlockingCollection<String>(new ConcurrentQueue<String>());
+        BlockingCollection<byte[]> unsentArrays = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
 
         /// <summary>
         /// A timer to make sure a heartbeat is received every second
@@ -113,17 +113,48 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                 data = data.Replace("\x10\x8A", "\x0A").Replace("\x10\x90", "\x10");
             }
-            
-            //public RobotPacket(bool synchronous, char tag, char id, string data)
-            //{
-            //    this.synchronous = synchronous;
-            //    this.tag = tag;
-            //    this.id = id;
-            //    this.data = data;
-            //    this.message = synchronous ? String.Empty : "\xf2";
-            //    string dataToSend = data.Replace("\x0A", "\x10\x8A").Replace("\x10", "\x10\x90");
-            //    this.message = this.message + tag + id + dataToSend;
-            //}
+        }
+
+        /// <summary>
+        /// Constructs a message to send to the Atmel
+        /// </summary>
+        /// <param name="synchronous">Is the message syncrhonous?</param>
+        /// <param name="tag">The tag to send</param>
+        /// <param name="id">The packet type</param>
+        /// <param name="data">The data</param>
+        /// <returns>A byte array to send</returns>
+        private byte[] ConstructSendMessage(bool synchronous, char tag, char id, byte[] data)
+        {
+            byte[] constructArray = new byte[3+data.Length*2];
+            int index = 0;
+            if(!synchronous)
+            {
+                constructArray[index++] = (byte)'\xf2';
+            }
+            constructArray[index++] = (byte) tag;
+            constructArray[index++] = (byte) id;
+            foreach(byte dataByte in data)
+            {
+                if(dataByte == (byte) '\x0A')
+                {
+                    constructArray[index++] = (byte)'\x10';
+                    constructArray[index++] = (byte)'\x8A';
+                }
+                else if (dataByte == (byte)'\x10')
+                {
+                    constructArray[index++] = (byte)'\x10';
+                    constructArray[index++] = (byte)'\x90';
+                }
+                else
+                {
+                    constructArray[index++] = dataByte;
+                }
+            }
+
+            byte[] returnArray = new byte[index];
+            Array.Copy(constructArray, 0, returnArray, 0, index);
+
+            return returnArray;
         }
 
         /// <summary>
@@ -169,6 +200,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void Stop()
         {
             _continue = false;
+            unsentArrays.Add(null);
             readThread.Join();
             writeThread.Join();
         }
@@ -176,18 +208,72 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void HandleCommand(String command)
         {
             String[] parts = command.Split(' ');
-            switch(parts[0])
-            {
-                case "reset":
-                    unsentStrings.Add("\n0M\n");
-                    break;
-                case "erase":
-                    //unsentStrings.Add("\n0O\n"); // We're not doing this yet
-                    break;
-                default:
-                    Console.WriteLine("Comms unrecognized command");
-                    break;
+            byte[] x, y, z;
+            byte[] dataToSend;
+            try {
+                switch (parts[0])
+                {
+                    case "reset":
+                        unsentArrays.Add(new byte[]{ (byte)'\n', (byte)'0', (byte)'M', (byte)'\n' });
+                        break;
+                    case "erase":
+                        // We're not doing this yet
+                        // unsentArrays.Add(new byte[] { (byte)'\n', (byte)'0', (byte)'O', (byte)'\n' });
+                        break;
+                    case "R":
+                        x = parseFloatBytes(float.Parse(parts[1]));
+                        y = parseFloatBytes(float.Parse(parts[2]));
+                        z = parseFloatBytes(float.Parse(parts[3]));
+                        dataToSend = new byte[x.Length + y.Length + z.Length];
+                        x.CopyTo(dataToSend, 0);
+                        y.CopyTo(dataToSend, x.Length);
+                        z.CopyTo(dataToSend, x.Length + y.Length);
+                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'R', dataToSend));
+                        break;
+                    case "A":
+                        dataToSend = new byte[1] { byte.Parse(parts[1]) };
+                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'A', dataToSend));
+                        break;
+                    case "Z":
+                        x = parseFloatBytes(float.Parse(parts[1]));
+                        y = parseFloatBytes(float.Parse(parts[2]));
+                        z = parseFloatBytes(float.Parse(parts[3]));
+                        dataToSend = new byte[x.Length + y.Length + z.Length];
+                        x.CopyTo(dataToSend, 0);
+                        y.CopyTo(dataToSend, x.Length);
+                        z.CopyTo(dataToSend, x.Length + y.Length);
+                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'Z', dataToSend));
+                        break;
+                    default:
+                        Console.WriteLine("Comms unrecognized command");
+                        break;
+                }
             }
+            catch
+            {
+                Console.WriteLine("Comms errorneous command");
+            }
+        }
+
+        /// <summary>
+        /// Parses the bytes of a float to be sent over comms
+        /// </summary>
+        /// <param name="f">the float</param>
+        /// <returns>the byte array to send</returns>
+        private byte[] parseFloatBytes(float f)
+        {
+            byte[] returnArray = BitConverter.GetBytes(f);
+            if (BitConverter.IsLittleEndian) return returnArray;
+
+            // other-endian; reverse this portion of the data (4 bytes)
+            byte tmp = returnArray[0];
+            returnArray[0] = returnArray[3];
+            returnArray[3] = tmp;
+            tmp = returnArray[1];
+            returnArray[1] = returnArray[2];
+            returnArray[2] = tmp;
+
+            return returnArray;
         }
 
         /// <summary>
@@ -195,13 +281,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private void WriteThread()
         {
-            String stringToWrite;
+            byte[] arrayToWrite;
             while (_continue)
             {
                 try
                 {
-                    stringToWrite = unsentStrings.Take(); // blocking
-                    serialPort.WriteLine(stringToWrite);
+                    arrayToWrite = unsentArrays.Take(); // blocking
+                    if (arrayToWrite == null) continue; // Sentinel value
+                    serialPort.Write(arrayToWrite, 0, arrayToWrite.Length);
+                    serialPort.Write("\n");
                 }
                 catch (TimeoutException)
                 {
@@ -253,6 +341,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 case 'p':
                     Console.WriteLine("MCU print: " + packet.data);
+                    // Ignoring for now due to large volume of prints
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",
