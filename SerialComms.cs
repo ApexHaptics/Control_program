@@ -44,6 +44,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         BlockingCollection<byte[]> unsentArrays = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
 
         /// <summary>
+        /// Handlers for packet responses. Each sender must specify a handler, which may be null
+        /// The string passed will be the packet data. This can be transformed into a byte array through BlockCopy operations
+        /// Ex: delegate(string s){ Console.WriteLine("DELEGATE SUCESSFULLY INVOKED"); }
+        /// </summary>
+        BlockingCollection<Action<String>> pendingActions = new BlockingCollection<Action<String>>(new ConcurrentQueue<Action<String>>());
+
+        /// <summary>
         /// A timer to make sure a heartbeat is received every second
         /// </summary>
         Timer heartbeatTimer;
@@ -118,19 +125,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Constructs a message to send to the Atmel
         /// </summary>
-        /// <param name="synchronous">Is the message syncrhonous?</param>
         /// <param name="tag">The tag to send</param>
         /// <param name="id">The packet type</param>
         /// <param name="data">The data</param>
         /// <returns>A byte array to send</returns>
-        private byte[] ConstructSendMessage(bool synchronous, char tag, char id, byte[] data)
+        private byte[] ConstructSendMessage(char tag, char id, byte[] data)
         {
             byte[] constructArray = new byte[3+data.Length*2];
             int index = 0;
-            if(!synchronous)
-            {
-                constructArray[index++] = (byte)'\xf2';
-            }
             constructArray[index++] = (byte) tag;
             constructArray[index++] = (byte) id;
             foreach(byte dataByte in data)
@@ -228,11 +230,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         x.CopyTo(dataToSend, 0);
                         y.CopyTo(dataToSend, x.Length);
                         z.CopyTo(dataToSend, x.Length + y.Length);
-                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'R', dataToSend));
+                        unsentArrays.Add(ConstructSendMessage('\0', 'R', dataToSend));
+                        pendingActions.Add(null);
                         break;
                     case "A":
                         dataToSend = new byte[1] { byte.Parse(parts[1]) };
-                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'A', dataToSend));
+                        unsentArrays.Add(ConstructSendMessage('\0', 'A', dataToSend));
+                        pendingActions.Add(null);
                         break;
                     case "Z":
                         x = parseFloatBytes(float.Parse(parts[1]));
@@ -242,7 +246,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         x.CopyTo(dataToSend, 0);
                         y.CopyTo(dataToSend, x.Length);
                         z.CopyTo(dataToSend, x.Length + y.Length);
-                        unsentArrays.Add(ConstructSendMessage(false, '\0', 'Z', dataToSend));
+                        unsentArrays.Add(ConstructSendMessage('\0', 'Z', dataToSend));
+                        pendingActions.Add(null);
                         break;
                     default:
                         Console.WriteLine("Comms unrecognized command");
@@ -288,6 +293,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     arrayToWrite = unsentArrays.Take(); // blocking
                     if (arrayToWrite == null) continue; // Sentinel value
+                    serialPort.Write("\n");
                     serialPort.Write(arrayToWrite, 0, arrayToWrite.Length);
                     serialPort.Write("\n");
                 }
@@ -315,7 +321,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     line = serialPort.ReadLine();
                     if (String.IsNullOrEmpty(line) || line == "≥\0") continue;
-                    if (line == "robo!" || line == "≥robo!")
+                    if (line == "≥robo!")
                     {
                         heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
                         continue;
@@ -323,6 +329,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     packet = new RobotPacket(line);
 
                     handleRobotPacket(packet);
+
+                    if(packet.synchronous)
+                    {
+                        Action<string> action = pendingActions.Take();
+                        if(action != null)
+                        {
+                            action(packet.data);
+                        }
+                    }
                 }
                 catch(TimeoutException)
                 {
@@ -340,12 +355,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             switch(packet.id)
             {
                 case 'p':
-                    Console.WriteLine("MCU print: " + packet.data);
+                    // Console.WriteLine("MCU print: " + packet.data);
                     // Ignoring for now due to large volume of prints
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",
-                        packet.synchronous ? "sync" : "async", packet.tag, packet.id, packet.data);
+                        packet.synchronous ? "sync" : "async",
+                        packet.tag == '\0' ? "null" : packet.tag.ToString(),
+                        packet.id, packet.data);
                     break;
             }
         }
