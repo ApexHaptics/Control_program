@@ -47,7 +47,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The last recorded mapping from colour space to skeleton space
         /// </summary>
-        private SkeletonPoint[] lastSkeletonMapping = new SkeletonPoint[640 * 480];
+        private SkeletonPoint[] lastSkeletonMapping = new SkeletonPoint[1280 * 960];
 
         /// <summary>
         /// Whether <see cref="lastSkeletonMapping"/> is initialized
@@ -113,7 +113,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 this.sensor.SkeletonFrameReady += this.SensorSkeletonFrameReady;
 
                 // Enable the camera to track the markers
-                this.sensor.ColorStream.Enable();
+                this.sensor.ColorStream.Enable(ColorImageFormat.RgbResolution1280x960Fps12);
                 this.sensor.ColorFrameReady += this.ColorFrameReady;
 
                 // Enable the depth camera to find the depth of each marker
@@ -183,7 +183,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 float yNum = (marker[0].X * marker[2].Y - marker[0].Y * marker[2].X) * (marker[1].Y - marker[3].Y) -
                     (marker[1].X * marker[3].Y - marker[1].Y * marker[3].X) * (marker[0].Y - marker[2].Y);
 
-                SkeletonPoint centerPoint = lastSkeletonMapping[(int)(yNum / den * sensor.ColorStream.FrameWidth + xNum / den)];
+                SkeletonPoint centerPoint = lastSkeletonMapping[(int)(yNum / den) * sensor.ColorStream.FrameWidth + (int)(xNum / den)];
                 SkeletonPoint point0 = lastSkeletonMapping[(int)(marker[0].Y * sensor.ColorStream.FrameWidth + marker[0].X)];
                 SkeletonPoint point1 = lastSkeletonMapping[(int)(marker[1].Y * sensor.ColorStream.FrameWidth + marker[1].X)];
                 SkeletonPoint point2 = lastSkeletonMapping[(int)(marker[2].Y * sensor.ColorStream.FrameWidth + marker[2].X)];
@@ -191,31 +191,68 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                 // If the center point is at 0, the depth sensor couldn't map it and nothing can be used
                 if (centerPoint.Z == 0) continue;
-                // TODO: Each marker should have an ID when sent
                 stringToSend = stringToSend + "MKR," + idList[i] + "," + centerPoint.X + "," + centerPoint.Y + "," + centerPoint.Z + ",";
 
-                // If any other points are at 0, we can't calculate the normal
+                // If any other points are at 0, we can't perform any further calculations
                 if (point0.Z == 0 || point1.Z == 0 || point2.Z == 0 || point3.Z == 0) return;
 
 
                 // Calculate line vectors between points 0 and 2 and 1 and 3 to do normal
                 SkeletonPoint u = new SkeletonPoint();
                 SkeletonPoint v = new SkeletonPoint();
-                u.X = point2.X - point0.X;
-                u.Y = point2.Y - point0.Y;
-                u.Z = point2.Z - point0.Z;
+                u.X = point0.X - point2.X;
+                u.Y = point0.Y - point2.Y;
+                u.Z = point0.Z - point2.Z;
                 v.X = point3.X - point1.X;
                 v.Y = point3.Y - point1.Y;
                 v.Z = point3.Z - point1.Z;
 
                 SkeletonPoint normal = new SkeletonPoint();
                 normal.X = (u.Y * v.Z) - (u.Z * v.Y);
-                normal.Y = (u.Z * v.X) - (u.X * v.Z);
+                normal.Y = (u.X * v.Z) - (u.Z * v.X);
                 normal.Z = (u.X * v.Y) - (u.Y * v.X);
+
+                normalizeVector(normal);
+
+                //SkeletonPoint headLocation = centerPoint;
+                //switch(idList[i])
+                //{
+                //    case 0: // Goggle centre
+                //        headLocation.X = headLocation.X - normal.X * 0.06f;
+                //        headLocation.Y = headLocation.Y - normal.Y * 0.06f;
+                //        headLocation.Z = headLocation.Z - normal.Z * 0.06f;
+                //        Console.WriteLine("HEAD LOCATION 0: " + headLocation.X + "," + headLocation.Y + "," + headLocation.Z);
+                //        break;
+                //    case 1: // Goggle left
+                //        headLocation.X = headLocation.X - normal.X * 0.075f;
+                //        headLocation.Y = headLocation.Y - normal.Y * 0.075f;
+                //        headLocation.Z = headLocation.Z - normal.Z * 0.075f;
+                //        Console.WriteLine("HEAD LOCATION 1: " + headLocation.X + "," + headLocation.Y + "," + headLocation.Z);
+                //        break;
+                //    default:
+                //        Console.WriteLine("UNKNOWN MARKER");
+                //        break;
+                //}
 
                 stringToSend = stringToSend + "NML," + normal.X + "," + normal.Y + "," + normal.Z + ",";
             }
-            bluetoothService.Send(stringToSend);
+
+            if (stringToSend.Length > 5) // More than just "MLoc,"
+            {
+                bluetoothService.Send(stringToSend);
+            }
+        }
+
+        /// <summary>
+        /// Normalizes a skeleton point into a unit vector
+        /// </summary>
+        /// <param name="point">The point to normalize</param>
+        public void normalizeVector(SkeletonPoint point)
+        {
+            float pointLength = (float)Math.Sqrt(Math.Pow(point.X, 2) + Math.Pow(point.Y, 2) + Math.Pow(point.Z, 2));
+            point.X = point.X / pointLength;
+            point.Y = point.Y / pointLength;
+            point.Z = point.Z / pointLength;
         }
 
         /// <summary>

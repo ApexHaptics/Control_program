@@ -30,12 +30,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Width of colour image
         /// </summary>
-        private const int cImgWidth = 640;
+        private const int cImgWidth = 1280;
 
         /// <summary>
         /// Height of colour image
         /// </summary>
-        private const int cImgHeight = 480;
+        private const int cImgHeight = 960;
+
+        /// <summary>
+        /// Marker finding will only run one in throttleFinding times
+        /// </summary>
+        private const int throttleFinding = 12;
+
+        /// <summary>
+        /// Total number of frames processed
+        /// </summary>
+        private int framesProcessed = 0;
 
         /// <summary>
         /// Drawing group for skeleton rendering output
@@ -61,7 +71,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private const double CornerThickness = 5;
 
         /// <summary>
-        /// Constructor for the SkeletonRender class
+        /// Constructor for the MarkerFinder class
         /// </summary>
         /// <param name="drawingGroup">Where the skeleton will be drawn onto</param>
         public MarkerFinder(DrawingGroup drawingGroup)
@@ -85,6 +95,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <returns>The array of points detected in the image</returns>
         public PointF[][] FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList)
         {
+            if (framesProcessed++ % throttleFinding != 0) return null;
+
             using (VectorOfInt ids = new VectorOfInt())
             using (VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF())
             using (VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF())
@@ -117,7 +129,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             // Undo mirroring
                             markerArray[i].X = cImgWidth - markerArray[i].X;
 
-                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[i].X, (int)markerArray[i].Y);
+                            // From front view, top right = blue = markerarray[0]. Rest are CCW
+                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[i].X/2, (int)markerArray[i].Y/2);
                             dc.DrawEllipse(
                                 this.cornerBrushes[i],
                                 null,

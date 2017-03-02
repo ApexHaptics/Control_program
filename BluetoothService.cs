@@ -214,7 +214,7 @@
         {
             if (_connWtr == null)
             {
-                Debug.WriteLine("SEND_MSG:" + message);
+                //Debug.WriteLine("SEND_MSG:" + message);
                 return false;
             }
             try
