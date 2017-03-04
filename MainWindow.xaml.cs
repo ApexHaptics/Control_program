@@ -13,9 +13,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
     using System.Linq;
     using System;
     using System.Drawing;
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
+    using System.Collections.Generic;    /// <summary>
+                                         /// Interaction logic for MainWindow.xaml
+                                         /// </summary>
     public partial class MainWindow : Window
     {
         /// <summary>
@@ -45,14 +45,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private SerialComms comms;
 
         /// <summary>
-        /// The last recorded mapping from colour space to skeleton space
+        /// The time of the last skeleton sending
         /// </summary>
-        private SkeletonPoint[] lastSkeletonMapping = new SkeletonPoint[1280 * 960];
-
-        /// <summary>
-        /// Whether <see cref="lastSkeletonMapping"/> is initialized
-        /// </summary>
-        private bool skeletonMapped = false;
+        DateTime lastSkeletonSent = DateTime.Now;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -117,7 +112,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 this.sensor.ColorFrameReady += this.ColorFrameReady;
 
                 // Enable the depth camera to find the depth of each marker
-                this.sensor.DepthStream.Enable();
+                this.sensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
                 this.sensor.DepthFrameReady += this.DepthFrameReady;
 
                 // Start the sensor!
@@ -149,8 +144,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 if (frame == null) return;
                 DepthImagePixel[] pixelData = new DepthImagePixel[frame.Width * frame.Height];
                 frame.CopyDepthImagePixelDataTo(pixelData);
-                this.sensor.CoordinateMapper.MapColorFrameToSkeletonFrame(sensor.ColorStream.Format, DepthImageFormat.Resolution640x480Fps30, pixelData, lastSkeletonMapping);
-                skeletonMapped = true;
+                //this.sensor.CoordinateMapper.MapColorFrameToSkeletonFrame(sensor.ColorStream.Format, DepthImageFormat.Resolution640x480Fps30, pixelData, lastSkeletonMapping);
+                //skeletonMapped = true;
             }
         }
 
@@ -161,86 +156,23 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="e">event arguments</param>
         private void ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
         {
-            System.Collections.Generic.List<int> idList = new System.Collections.Generic.List<int>();
-            PointF[][] markerArray = finder.FindMarkers(e, idList);
+            List<int> idList = new List<int>();
+            List<double[]> rotationList = new List<double[]>();
+            List<double[]> translationList = new List<double[]>();
+            double deltaT = 0;
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT);
 
-            if (markerArray == null || markerArray.Length == 0 || skeletonMapped == false) return;
+            if (markerCount == 0) return;
 
-            string stringToSend = "MLoc,";
+            string stringToSend = "MLoc," + (int)deltaT;
+
+            for(int i = 0; i < markerCount; i++)
+            {
+                stringToSend = stringToSend + "MKR," + idList[i] + "," + translationList[i][0] + "," + translationList[i][1] + "," +
+                    translationList[i][2] + "," + rotationList[i][2] + ",";
+            }
             
-            // Important to note is that marker vertices are counterclockwise starting from top left
-            for (int i = 0; i < markerArray.Length; i++)
-            {
-                PointF[] marker = markerArray[i];
-
-                // Find center before converting to skeleton space. Lag between color
-                // frames and depth frames could cause problems as seen in Kinect Studio
-                // Using https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line
-                float den = (marker[0].X - marker[2].X) * (marker[1].Y - marker[3].Y) -
-                    (marker[0].Y - marker[2].Y) * (marker[1].X - marker[3].X);
-                float xNum = (marker[0].X * marker[2].Y - marker[0].Y * marker[2].X) * (marker[1].X - marker[3].X) -
-                    (marker[1].X * marker[3].Y - marker[1].Y * marker[3].X) * (marker[0].X - marker[2].X);
-                float yNum = (marker[0].X * marker[2].Y - marker[0].Y * marker[2].X) * (marker[1].Y - marker[3].Y) -
-                    (marker[1].X * marker[3].Y - marker[1].Y * marker[3].X) * (marker[0].Y - marker[2].Y);
-
-                SkeletonPoint centerPoint = lastSkeletonMapping[(int)(yNum / den) * sensor.ColorStream.FrameWidth + (int)(xNum / den)];
-                SkeletonPoint point0 = lastSkeletonMapping[(int)(marker[0].Y * sensor.ColorStream.FrameWidth + marker[0].X)];
-                SkeletonPoint point1 = lastSkeletonMapping[(int)(marker[1].Y * sensor.ColorStream.FrameWidth + marker[1].X)];
-                SkeletonPoint point2 = lastSkeletonMapping[(int)(marker[2].Y * sensor.ColorStream.FrameWidth + marker[2].X)];
-                SkeletonPoint point3 = lastSkeletonMapping[(int)(marker[3].Y * sensor.ColorStream.FrameWidth + marker[3].X)];
-
-                // If the center point is at 0, the depth sensor couldn't map it and nothing can be used
-                if (centerPoint.Z == 0) continue;
-                stringToSend = stringToSend + "MKR," + idList[i] + "," + centerPoint.X + "," + centerPoint.Y + "," + centerPoint.Z + ",";
-
-                // If any other points are at 0, we can't perform any further calculations
-                if (point0.Z == 0 || point1.Z == 0 || point2.Z == 0 || point3.Z == 0) return;
-
-
-                // Calculate line vectors between points 0 and 2 and 1 and 3 to do normal
-                SkeletonPoint u = new SkeletonPoint();
-                SkeletonPoint v = new SkeletonPoint();
-                u.X = point0.X - point2.X;
-                u.Y = point0.Y - point2.Y;
-                u.Z = point0.Z - point2.Z;
-                v.X = point3.X - point1.X;
-                v.Y = point3.Y - point1.Y;
-                v.Z = point3.Z - point1.Z;
-
-                SkeletonPoint normal = new SkeletonPoint();
-                normal.X = (u.Y * v.Z) - (u.Z * v.Y);
-                normal.Y = (u.X * v.Z) - (u.Z * v.X);
-                normal.Z = (u.X * v.Y) - (u.Y * v.X);
-
-                normalizeVector(normal);
-
-                //SkeletonPoint headLocation = centerPoint;
-                //switch(idList[i])
-                //{
-                //    case 0: // Goggle centre
-                //        headLocation.X = headLocation.X - normal.X * 0.06f;
-                //        headLocation.Y = headLocation.Y - normal.Y * 0.06f;
-                //        headLocation.Z = headLocation.Z - normal.Z * 0.06f;
-                //        Console.WriteLine("HEAD LOCATION 0: " + headLocation.X + "," + headLocation.Y + "," + headLocation.Z);
-                //        break;
-                //    case 1: // Goggle left
-                //        headLocation.X = headLocation.X - normal.X * 0.075f;
-                //        headLocation.Y = headLocation.Y - normal.Y * 0.075f;
-                //        headLocation.Z = headLocation.Z - normal.Z * 0.075f;
-                //        Console.WriteLine("HEAD LOCATION 1: " + headLocation.X + "," + headLocation.Y + "," + headLocation.Z);
-                //        break;
-                //    default:
-                //        Console.WriteLine("UNKNOWN MARKER");
-                //        break;
-                //}
-
-                stringToSend = stringToSend + "NML," + normal.X + "," + normal.Y + "," + normal.Z + ",";
-            }
-
-            if (stringToSend.Length > 5) // More than just "MLoc,"
-            {
-                bluetoothService.Send(stringToSend);
-            }
+            bluetoothService.Send(stringToSend);
         }
 
         /// <summary>
@@ -276,6 +208,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (skeletonToSend != null)
             {
                 string stringToSend = "JLoc,";
+
+                DateTime tempNow = DateTime.Now;
+                stringToSend = stringToSend + (int)tempNow.Subtract(lastSkeletonSent).TotalMilliseconds + ",";
+                lastSkeletonSent = tempNow;
 
                 // Order: SC, HD, WL, HL, WR, HR
                 foreach (Joint joint in skeletonToSend.Joints)

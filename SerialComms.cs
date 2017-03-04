@@ -203,8 +203,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             _continue = false;
             unsentArrays.Add(null);
-            readThread.Join();
-            writeThread.Join();
+            if (readThread != null)
+            {
+                readThread.Join();
+            }
+            if (writeThread != null)
+            {
+                writeThread.Join();
+            }
         }
 
         public void HandleCommand(String command)
@@ -270,15 +276,28 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             byte[] returnArray = BitConverter.GetBytes(f);
             if (BitConverter.IsLittleEndian) return returnArray;
 
-            // other-endian; reverse this portion of the data (4 bytes)
-            byte tmp = returnArray[0];
-            returnArray[0] = returnArray[3];
-            returnArray[3] = tmp;
-            tmp = returnArray[1];
-            returnArray[1] = returnArray[2];
-            returnArray[2] = tmp;
-
+            Array.Reverse(returnArray);
             return returnArray;
+        }
+
+        /// <summary>
+        /// Parses a float from bytes received over comms
+        /// </summary>
+        /// <param name="array">The byte array</param>
+        /// <param name="index">The index to start at</param>
+        /// <returns>The float it represents</returns>
+        private float parseFloatBytes(byte[] array, int index)
+        {
+            if (BitConverter.IsLittleEndian)
+            {
+                return BitConverter.ToSingle(array, index);
+            }
+
+            byte[] subArrray = new byte[] { array[index + 3],
+                array[index + 2], array[index + 1], array[index] };
+
+            Array.Reverse(subArrray);
+            return BitConverter.ToSingle(subArrray, 0);
         }
 
         /// <summary>
@@ -328,8 +347,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     }
                     packet = new RobotPacket(line);
 
-                    handleRobotPacket(packet);
-
                     if(packet.synchronous)
                     {
                         Action<string> action = pendingActions.Take();
@@ -337,6 +354,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         {
                             action(packet.data);
                         }
+                    }
+                    else
+                    {
+                        handleRobotPacket(packet);
                     }
                 }
                 catch(TimeoutException)
@@ -357,6 +378,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 case 'p':
                     // Console.WriteLine("MCU print: " + packet.data);
                     // Ignoring for now due to large volume of prints
+                    break;
+                case 'A':
+                    // Packet content should be 3 floats theta1, theta2, theta3
+                    byte[] data = new byte[12];
+                    Buffer.BlockCopy(packet.data.ToCharArray(), 0, data, 0, data.Length);
+                    float theta1 = parseFloatBytes(data, 0);
+                    float theta2 = parseFloatBytes(data, 4);
+                    float theta3 = parseFloatBytes(data, 8);
+                    double[] position = Physics.physics_fkin(theta1, theta2, theta3);
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",

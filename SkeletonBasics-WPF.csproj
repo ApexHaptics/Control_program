@@ -81,6 +81,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="MarkerFinder.cs" />
+    <Compile Include="Physics.cs" />
     <Compile Include="SerialComms.cs" />
     <Compile Include="SkeletonRenderer.cs" />
     <Page Include="MainWindow.xaml">
