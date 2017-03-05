@@ -83,7 +83,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The last time of the last camera update
         /// </summary>
-        private DateTime lastUpdateTime = new DateTime();
+        private DateTime lastUpdateTime = new DateTime(0);
 
         /// <summary>
         /// The length of a marker edge used for scaling translation vectors

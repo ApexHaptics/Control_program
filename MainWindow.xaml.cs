@@ -47,7 +47,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The time of the last skeleton sending
         /// </summary>
-        DateTime lastSkeletonSent = DateTime.Now;
+        DateTime lastSkeletonSent = new DateTime(0);
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -165,7 +165,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             if (markerCount == 0) return;
 
-            string stringToSend = "MLoc," + (int)deltaT;
+            string stringToSend = "MLoc," + (int)deltaT + ",";
 
             stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleAngle + ",";
             
