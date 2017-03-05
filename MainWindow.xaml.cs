@@ -86,7 +86,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             MarkerOverlay.Source = markerSource;
 
             // Start up comms
-            comms = new SerialComms();
+            comms = new SerialComms(this.positionUpdated);
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
