@@ -70,11 +70,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private const double CornerThickness = 5;
 
-        private PointF[] objCorners = new PointF[]{new PointF(-4, -4),
-            new PointF(4, -4),
-            new PointF(4, 4),
-            new PointF(-4, 4)};
-
         /// <summary>
         /// The camera parameters found from the camera calibration
         /// </summary>
@@ -89,6 +84,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// The last time of the last camera update
         /// </summary>
         private DateTime lastUpdateTime = new DateTime();
+
+        /// <summary>
+        /// The length of a marker edge used for scaling translation vectors
+        /// </summary>
+        private const float MarkerWidth = 0.07f;
+
+        private enum MarkerTypes
+        {
+            HeadLeft = 0,
+            HeadCenter = 1,
+            HeadRight = 2,
+        }
 
         /// <summary>
         /// Constructor for the MarkerFinder class
@@ -138,8 +145,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="rotationVectors">a list to be populated with found rotation vectors</param>
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
+        /// <param name="goggleAngle">will be populated with the horizontal goggle angle (rad)</param>
         /// <returns>The number of markers found</returns>
-        public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors, List<double[]> translationVectors, ref double deltaT)
+        public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
+            List<double[]> translationVectors, ref double deltaT, ref double goggleAngle, List<double> headPos)
         {
             if (framesProcessed++ % throttleFinding != 0) return 0;
 
@@ -180,9 +189,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 using (Mat rvecs = new Mat())
                 using (Mat tvecs = new Mat())
                 {
+                    List<double> angles = new List<double>();
+                    List<double> headX = new List<double>();
+                    List<double> headY = new List<double>();
+                    List<double> headZ = new List<double>();
                     try
                     {
-                        ArucoInvoke.EstimatePoseSingleMarkers(corners, 0.08f, cameraMatrix, distortionParameters, rvecs, tvecs);
+                        ArucoInvoke.EstimatePoseSingleMarkers(corners, MarkerWidth, cameraMatrix, distortionParameters, rvecs, tvecs);
                     }
                     catch (Exception ex)
                     {
@@ -192,14 +205,74 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     {
                         using (Mat rvecMat = rvecs.Row(i))
                         using (Mat tvecMat = tvecs.Row(i))
+                        using (Mat transMat = new Mat())
                         {
                             double[] values = new double[3];
                             rvecMat.CopyTo(values);
                             rotationVectors.Add(values);
+                            values = new double[3];
                             tvecMat.CopyTo(values);
                             translationVectors.Add(values);
+
+                            double angle;
+
+                            switch ((MarkerTypes)ids[i])
+                            {
+                                case MarkerTypes.HeadLeft:
+                                    angle = Math.PI / -2;
+                                    break;
+                                case MarkerTypes.HeadCenter:
+                                    angle = 0;
+                                    break;
+                                case MarkerTypes.HeadRight:
+                                    angle = Math.PI / 2;
+                                    break;
+                                default:
+                                    continue;
+                            }
+
+                            CvInvoke.Rodrigues(rvecMat, transMat);
+                            double x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
+                            double z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
+                            angle += Math.Atan2(x, z);
+                            angle = (angle + Math.PI * 2) % (Math.PI * 2);
+
+                            angles.Add(angle);
+
+                            Matrix<double> offset = new Matrix<double>(3,1);
+                            switch ((MarkerTypes)ids[i])
+                            {
+                                case MarkerTypes.HeadLeft:
+                                    offset[0, 0] = 0;
+                                    offset[1, 0] = 0;
+                                    offset[2, 0] = -0.07;
+                                    break;
+                                case MarkerTypes.HeadCenter:
+                                    offset[0, 0] = 0;
+                                    offset[1, 0] = 0;
+                                    offset[2, 0] = -0.045;
+                                    break;
+                                case MarkerTypes.HeadRight:
+                                    offset[0, 0] = 0;
+                                    offset[1, 0] = 0;
+                                    offset[2, 0] = -0.07;
+                                    break;
+                                default:
+                                    continue;
+                            }
+                            Matrix<double> transMatrix = new Matrix<double>(transMat.Width, transMat.Height);
+                            transMat.CopyTo(transMatrix);
+                            Matrix<double> position = new Matrix<double>(translationVectors[i]);
+                            position = position + transMatrix * offset;
+                            headX.Add(position.Data[0, 0]);
+                            headY.Add(position.Data[1, 0]);
+                            headZ.Add(position.Data[2, 0]);
                         }
                     }
+                    goggleAngle = angles.Average();
+                    headPos.Add(headX.Average());
+                    headPos.Add(headY.Average());
+                    headPos.Add(headZ.Average());
                 }
 
                 // Draw the markers
@@ -209,9 +282,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
                     foreach (PointF[] markerArray in outArray)
                     {
-                        Mat hMat = new Mat();
-                        CvInvoke.FindHomography(objCorners, markerArray, hMat, Emgu.CV.CvEnum.HomographyMethod.Default);
-
                         for (int i = 0; i < markerArray.Length; i++)
                         {
                             // Redo mirroring

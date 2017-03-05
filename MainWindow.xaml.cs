@@ -159,18 +159,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<int> idList = new List<int>();
             List<double[]> rotationList = new List<double[]>();
             List<double[]> translationList = new List<double[]>();
-            double deltaT = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT);
+            List<double> headPos = new List<double>();
+            double deltaT = 0, goggleAngle = 0;
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleAngle, headPos);
 
             if (markerCount == 0) return;
 
             string stringToSend = "MLoc," + (int)deltaT;
 
-            for(int i = 0; i < markerCount; i++)
-            {
-                stringToSend = stringToSend + "MKR," + idList[i] + "," + translationList[i][0] + "," + translationList[i][1] + "," +
-                    translationList[i][2] + "," + rotationList[i][2] + ",";
-            }
+            stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleAngle + ",";
             
             bluetoothService.Send(stringToSend);
         }
