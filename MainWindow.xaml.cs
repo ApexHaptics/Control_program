@@ -86,7 +86,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             MarkerOverlay.Source = markerSource;
 
             // Start up comms
-            comms = new SerialComms(this.positionUpdated);
+            comms = new SerialComms(this.positionUpdated, EnableButton);
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
@@ -284,6 +284,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             }
         }
 
+        /// <summary>
+        /// Handle a KeyDown event in the textbox, filtering for returns
+        /// </summary>
+        /// <param name="sender">Unused</param>
+        /// <param name="e">Unused</param>
         private void SerialCommandBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             if (e.Key == System.Windows.Input.Key.Return)
@@ -292,6 +297,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 comms.HandleCommand(SerialCommandBox.Text);
                 SerialCommandBox.Text = "";
             }
+        }
+
+        /// <summary>
+        /// Handle a click on the enable button
+        /// </summary>
+        /// <param name="sender">Unused</param>
+        /// <param name="e">Unused</param>
+        private void EnableButton_Click(object sender, RoutedEventArgs e)
+        {
+            comms.HandleCommand((string)EnableButton.Content);
         }
     }
 }

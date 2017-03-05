@@ -70,6 +70,9 @@
             <StatusBarItem Padding="0 0 0 10">
                 <TextBlock Name="statusBarText" Margin="-1 0 0 0">Click 'Seated' to change skeletal pipeline type!</TextBlock>
             </StatusBarItem>
-        </StatusBar>       
+        </StatusBar>
+        <Button Grid.Row="3" Grid.Column="2" Height="Auto" HorizontalAlignment="Right" Background="DarkGreen" Foreground="White" Name="EnableButton" Click="EnableButton_Click">
+            Enable Controller
+        </Button>
     </Grid>
 </Window>

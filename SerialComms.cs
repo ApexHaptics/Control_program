@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Windows.Controls;
 
 namespace Microsoft.Samples.Kinect.SkeletonBasics
 {
@@ -70,6 +71,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// The action to be invoked when a new position is available from 
         /// </summary>
         Action<double[]> handlePosUpdate;
+
+        /// <summary>
+        /// The button which enables/disables the controller
+        /// </summary>
+        Button enableButton;
 
         /// <summary>
         /// A packet received from the robot
@@ -167,9 +173,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Constructor for the SerialComms class
         /// </summary>
-        public SerialComms(Action<double[]> handlePosUpdate)
+        /// <param name="handlePosUpdate">The handler for robot position updates</param>
+        /// <param name="enableButton">The button to enable/disable the controller</param>
+        public SerialComms(Action<double[]> handlePosUpdate, Button enableButton)
         {
             this.handlePosUpdate = handlePosUpdate;
+            this.enableButton = enableButton;
             String portName = FindDevicePort();
             if(String.IsNullOrEmpty(portName))
             {
@@ -193,13 +202,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 return;
             }
 
+            heartbeatTimer = new Timer(HeartbeatTimerExpiry);
+            heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
+
             readThread = new Thread(ReadThread);
             readThread.Start();
             writeThread = new Thread(WriteThread);
             writeThread.Start();
-
-            heartbeatTimer = new Timer(HeartbeatTimerExpiry);
-            heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
         }
 
         /// <summary>
@@ -262,12 +271,20 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         pendingActions.Add(null);
                         break;
                     case "E":
+                    case "Enable":
+                        if (!enableButton.IsEnabled) break;
+                        enableButton.IsEnabled = false;
                         unsentArrays.Add(ConstructSendMessage('\0', 'E', new byte[0]));
-                        pendingActions.Add(null);
+                        pendingActions.Add(enablerHandler);
+                        enableButton.Background = System.Windows.Media.Brushes.DarkGray;
                         break;
                     case "D":
+                    case "Disable":
+                        if (!enableButton.IsEnabled) break;
+                        enableButton.IsEnabled = false;
                         unsentArrays.Add(ConstructSendMessage('\0', 'D', new byte[0]));
-                        pendingActions.Add(null);
+                        pendingActions.Add(enablerHandler);
+                        enableButton.Background = System.Windows.Media.Brushes.DarkGray;
                         break;
                     default:
                         Console.WriteLine("Comms unrecognized command");
@@ -278,6 +295,28 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 Console.WriteLine("Comms errorneous command");
             }
+        }
+
+        /// <summary>
+        /// Handler for enable/disable commands
+        /// </summary>
+        /// <param name="s">Unused</param>
+        void enablerHandler(String s)
+        {
+            Action a = delegate {
+                if ((string)enableButton.Content == "Enable Controller")
+                {
+                    enableButton.Content = "Disable Controller";
+                    enableButton.Background = System.Windows.Media.Brushes.DarkRed;
+                }
+                else
+                {
+                    enableButton.Content = "Enable Controller";
+                    enableButton.Background = System.Windows.Media.Brushes.DarkGreen;
+                }
+                enableButton.IsEnabled = true;
+            };
+            enableButton.Dispatcher.Invoke(a);
         }
 
         /// <summary>
@@ -385,6 +424,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             }
         }
 
+        /// <summary>
+        /// A function to handle an asynchronour robot packet
+        /// </summary>
+        /// <param name="packet">The packet from the robot</param>
         private void handleRobotPacket(RobotPacket packet)
         {
             switch(packet.id)
@@ -412,6 +455,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             }
         }
 
+        /// <summary>
+        /// A function which reports when heartbeat packets timeout
+        /// </summary>
+        /// <param name="state">Unused</param>
         private void HeartbeatTimerExpiry(object state)
         {
             Console.WriteLine("MCU heartbeat missed");
