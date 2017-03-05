@@ -95,6 +95,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             HeadLeft = 0,
             HeadCenter = 1,
             HeadRight = 2,
+            EndEffector = 3,
         }
 
         /// <summary>
@@ -137,7 +138,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         }
 
         /// <summary>
-        /// Returns the marker locations in a new colour frame
+        /// Returns the marker locations in a new colour frame. All positions in m
         /// </summary>
         /// <param name="e">The colour frame data passed</param>
         /// <param name="sender">object sending the event</param>
@@ -146,9 +147,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
         /// <param name="goggleAngle">will be populated with the horizontal goggle angle (rad)</param>
+        /// <param name="headPos">will be populated the averaged position vector of the head (x,y,z)</param>
+        /// <param name="headPos">will be populated the averaged position vector of the robot end effector (x,y,z)</param>
         /// <returns>The number of markers found</returns>
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
-            List<double[]> translationVectors, ref double deltaT, ref double goggleAngle, List<double> headPos)
+            List<double[]> translationVectors, ref double deltaT, ref double goggleAngle, List<double> headPos, List<double> eePos)
         {
             if (framesProcessed++ % throttleFinding != 0) return 0;
 
@@ -214,32 +217,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             tvecMat.CopyTo(values);
                             translationVectors.Add(values);
 
-                            double angle;
-
-                            switch ((MarkerTypes)ids[i])
-                            {
-                                case MarkerTypes.HeadLeft:
-                                    angle = Math.PI / -2;
-                                    break;
-                                case MarkerTypes.HeadCenter:
-                                    angle = 0;
-                                    break;
-                                case MarkerTypes.HeadRight:
-                                    angle = Math.PI / 2;
-                                    break;
-                                default:
-                                    continue;
-                            }
-
-                            CvInvoke.Rodrigues(rvecMat, transMat);
-                            double x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
-                            double z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
-                            angle += Math.Atan2(x, z);
-                            angle = (angle + Math.PI * 2) % (Math.PI * 2);
-
-                            angles.Add(angle);
-
-                            Matrix<double> offset = new Matrix<double>(3,1);
+                            // Calculate position with offset
+                            Matrix<double> offset = new Matrix<double>(3, 1);
                             switch ((MarkerTypes)ids[i])
                             {
                                 case MarkerTypes.HeadLeft:
@@ -257,22 +236,64 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                                     offset[1, 0] = 0;
                                     offset[2, 0] = -0.07;
                                     break;
+                                case MarkerTypes.EndEffector:
+                                    // TODO: Find end effector offset
+                                    offset[0, 0] = 0;
+                                    offset[1, 0] = 0;
+                                    offset[2, 0] = 0;
+                                    break;
                                 default:
                                     continue;
                             }
+
+                            CvInvoke.Rodrigues(rvecMat, transMat);
                             Matrix<double> transMatrix = new Matrix<double>(transMat.Width, transMat.Height);
                             transMat.CopyTo(transMatrix);
                             Matrix<double> position = new Matrix<double>(translationVectors[i]);
                             position = position + transMatrix * offset;
+
+                            if ((MarkerTypes)ids[i] == MarkerTypes.EndEffector)
+                            {
+                                eePos.Add(position.Data[0, 0]);
+                                eePos.Add(position.Data[1, 0]);
+                                eePos.Add(position.Data[2, 0]);
+                            }
+
+                            // Calculate horizontal angle - Only for head markers
+                            double angle;
+                            switch ((MarkerTypes)ids[i])
+                            {
+                                case MarkerTypes.HeadLeft:
+                                    angle = Math.PI / -2;
+                                    break;
+                                case MarkerTypes.HeadCenter:
+                                    angle = 0;
+                                    break;
+                                case MarkerTypes.HeadRight:
+                                    angle = Math.PI / 2;
+                                    break;
+                                default:
+                                    continue;
+                            }
+                            double x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
+                            double z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
+                            angle += Math.Atan2(x, z);
+                            angle = (angle + Math.PI * 2) % (Math.PI * 2);
+
+                            // Add head marker data to lists - nothing else should have made it here
                             headX.Add(position.Data[0, 0]);
                             headY.Add(position.Data[1, 0]);
                             headZ.Add(position.Data[2, 0]);
+                            angles.Add(angle);
                         }
                     }
-                    goggleAngle = angles.Average();
-                    headPos.Add(headX.Average());
-                    headPos.Add(headY.Average());
-                    headPos.Add(headZ.Average());
+                    if (angles.Count != 0)
+                    {
+                        goggleAngle = angles.Average();
+                        headPos.Add(headX.Average());
+                        headPos.Add(headY.Average());
+                        headPos.Add(headZ.Average());
+                    }
                 }
 
                 // Draw the markers

@@ -165,15 +165,23 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double[]> rotationList = new List<double[]>();
             List<double[]> translationList = new List<double[]>();
             List<double> headPos = new List<double>();
+            List<double> eePos = new List<double>();
             double deltaT = 0, goggleAngle = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleAngle, headPos);
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleAngle, headPos, eePos);
 
-            if (markerCount == 0) return;
+            if (markerCount == 0 || (headPos.Count == 0 && eePos.Count == 0)) return;
 
             string stringToSend = "MLoc," + (int)deltaT + ",";
 
-            stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleAngle + ",";
-            
+            if (headPos.Count != 0)
+            {
+                stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleAngle + ",";
+            }
+            if (eePos.Count != 0)
+            {
+                stringToSend = stringToSend + "EEF," + eePos[0] + "," + eePos[1] + "," + eePos[2] + ",";
+            }
+
             bluetoothService.Send(stringToSend);
         }
 
@@ -243,6 +251,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             stringToSend = stringToSend + (int)tempNow.Subtract(lastPosSent).TotalMilliseconds + ",";
             lastPosSent = tempNow;
 
+            // TODO: This is in robot frame and should be adjusted to Kinect frame.
             stringToSend = stringToSend + position[0] + position[1] + position[2];
             bluetoothService.Send(stringToSend);
         }
