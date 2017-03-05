@@ -67,6 +67,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         bool _continue = true;
 
         /// <summary>
+        /// The action to be invoked when a new position is available from 
+        /// </summary>
+        Action<double[]> handlePosUpdate;
+
+        /// <summary>
         /// A packet received from the robot
         /// </summary>
         public struct RobotPacket
@@ -162,8 +167,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Constructor for the SerialComms class
         /// </summary>
-        public SerialComms()
+        public SerialComms(Action<double[]> handlePosUpdate)
         {
+            this.handlePosUpdate = handlePosUpdate;
             String portName = FindDevicePort();
             if(String.IsNullOrEmpty(portName))
             {
@@ -253,6 +259,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         y.CopyTo(dataToSend, x.Length);
                         z.CopyTo(dataToSend, x.Length + y.Length);
                         unsentArrays.Add(ConstructSendMessage('\0', 'Z', dataToSend));
+                        pendingActions.Add(null);
+                        break;
+                    case "E":
+                        unsentArrays.Add(ConstructSendMessage('\0', 'E', new byte[0]));
+                        pendingActions.Add(null);
+                        break;
+                    case "D":
+                        unsentArrays.Add(ConstructSendMessage('\0', 'D', new byte[0]));
                         pendingActions.Add(null);
                         break;
                     default:
@@ -387,6 +401,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     float theta2 = parseFloatBytes(data, 4);
                     float theta3 = parseFloatBytes(data, 8);
                     double[] position = Physics.physics_fkin(theta1, theta2, theta3);
+                    handlePosUpdate(position);
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",

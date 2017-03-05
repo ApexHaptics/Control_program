@@ -61,9 +61,6 @@
                 System.Windows.MessageBox.Show(msg);
                 throw new InvalidOperationException(msg, ex);
             }
-            // TODO Check radio?
-            //
-            // Always run server?
             StartListener();
         }
 
@@ -71,11 +68,6 @@
         {
             var dlg = new SelectBluetoothDeviceDialog();
             var rslt = dlg.ShowDialog();
-            //if (rslt != DialogResult.OK) TODO: Figure this out
-            //{
-            //    AddMessage(MessageSource.Info, "Cancelled select device.");
-            //    return null;
-            //}
             var addr = dlg.SelectedDevice.DeviceAddress;
             return addr;
         }

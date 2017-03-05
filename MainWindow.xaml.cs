@@ -50,6 +50,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         DateTime lastSkeletonSent = new DateTime(0);
 
         /// <summary>
+        /// The time of the last skeleton sending
+        /// </summary>
+        DateTime lastPosSent = new DateTime(0);
+
+        /// <summary>
         /// Initializes a new instance of the MainWindow class.
         /// </summary>
         public MainWindow()
@@ -224,6 +229,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             }
 
             this.renderer.RenderSkeletons(skeletons);
+        }
+
+        /// <summary>
+        /// Handle a position update from the forward kinematics
+        /// </summary>
+        /// <param name="position">The position of the robot</param>
+        private void positionUpdated(double[] position)
+        {
+            string stringToSend = "Rpos,";
+
+            DateTime tempNow = DateTime.Now;
+            stringToSend = stringToSend + (int)tempNow.Subtract(lastPosSent).TotalMilliseconds + ",";
+            lastPosSent = tempNow;
+
+            stringToSend = stringToSend + position[0] + position[1] + position[2];
+            bluetoothService.Send(stringToSend);
         }
 
         /// <summary>
