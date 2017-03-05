@@ -237,7 +237,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="position">The position of the robot</param>
         private void positionUpdated(double[] position)
         {
-            string stringToSend = "Rpos,";
+            string stringToSend = "RPos,";
 
             DateTime tempNow = DateTime.Now;
             stringToSend = stringToSend + (int)tempNow.Subtract(lastPosSent).TotalMilliseconds + ",";
