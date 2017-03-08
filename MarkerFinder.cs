@@ -86,7 +86,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private DateTime lastUpdateTime = new DateTime(0);
 
         /// <summary>
-        /// The length of a marker edge used for scaling translation vectors
+        /// The length of a marker edge (in m) used for scaling translation vectors
         /// </summary>
         private const float MarkerWidth = 0.07f;
 
@@ -146,12 +146,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="rotationVectors">a list to be populated with found rotation vectors</param>
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
-        /// <param name="goggleAngle">will be populated with the horizontal goggle angle (rad)</param>
-        /// <param name="headPos">will be populated the averaged position vector of the head (x,y,z)</param>
-        /// <param name="headPos">will be populated the averaged position vector of the robot end effector (x,y,z)</param>
+        /// <param name="goggleHorizAngle">will be populated with the horizontal goggle angle (rad)</param>
+        /// <param name="goggleVertAngle">will be populated with the vertical goggle angle (rad)</param>
+        /// <param name="headPos">will be populated with the averaged position vector of the head (x,y,z)</param>
+        /// <param name="eePos">will be populated with the position vector of the end effector (x,y,z)</param>
         /// <returns>The number of markers found</returns>
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
-            List<double[]> translationVectors, ref double deltaT, ref double goggleAngle, List<double> headPos, List<double> eePos)
+            List<double[]> translationVectors, ref double deltaT, ref double goggleHorizAngle, ref double goggleVertAngle, List<double> headPos, List<double> eePos)
         {
             if (framesProcessed++ % throttleFinding != 0) return 0;
 
@@ -192,7 +193,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 using (Mat rvecs = new Mat())
                 using (Mat tvecs = new Mat())
                 {
-                    List<double> angles = new List<double>();
+                    List<double> horizHeadAngles = new List<double>();
+                    List<double> vertHeadAngles = new List<double>();
                     List<double> headX = new List<double>();
                     List<double> headY = new List<double>();
                     List<double> headZ = new List<double>();
@@ -259,37 +261,43 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                                 eePos.Add(position.Data[2, 0]);
                             }
 
-                            // Calculate horizontal angle - Only for head markers
-                            double angle;
-                            switch ((MarkerTypes)ids[i])
+                            // Calculate view angle - Only for head markers
+                            double offset_angle;
+                            switch ((MarkerTypes)ids[i]) // Find the horizontal offset angle of the 
                             {
                                 case MarkerTypes.HeadLeft:
-                                    angle = Math.PI / -2;
+                                    offset_angle = Math.PI / -2;
                                     break;
                                 case MarkerTypes.HeadCenter:
-                                    angle = 0;
+                                    offset_angle = 0;
                                     break;
                                 case MarkerTypes.HeadRight:
-                                    angle = Math.PI / 2;
+                                    offset_angle = Math.PI / 2;
                                     break;
                                 default:
                                     continue;
                             }
-                            double x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
-                            double z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
-                            angle += Math.Atan2(x, z);
-                            angle = (angle + Math.PI * 2) % (Math.PI * 2);
+                            Matrix<double> trans_x = transMatrix.GetCol(0);
+                            Matrix<double> trans_z = transMatrix.GetCol(2);
+                            Matrix<double> head_normal = Math.Cos(offset_angle) * trans_z + Math.Sin(offset_angle) * trans_x;
+                            double head_normal_x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
+                            double head_normal_y = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
+                            double head_normal_z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
+                            double horiz_angle = Math.Atan2(head_normal_x, head_normal_z);
+                            vertHeadAngles.Add(Math.Asin(head_normal_y));
+                            horiz_angle = (horiz_angle + Math.PI * 2) % (Math.PI * 2);
 
                             // Add head marker data to lists - nothing else should have made it here
                             headX.Add(position.Data[0, 0]);
                             headY.Add(position.Data[1, 0]);
                             headZ.Add(position.Data[2, 0]);
-                            angles.Add(angle);
+                            horizHeadAngles.Add(horiz_angle);
                         }
                     }
-                    if (angles.Count != 0)
+                    if (horizHeadAngles.Count != 0)
                     {
-                        goggleAngle = angles.Average();
+                        goggleHorizAngle = horizHeadAngles.Average();
+                        goggleVertAngle = vertHeadAngles.Average();
                         headPos.Add(headX.Average());
                         headPos.Add(headY.Average());
                         headPos.Add(headZ.Average());
