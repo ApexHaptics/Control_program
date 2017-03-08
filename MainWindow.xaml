@@ -71,8 +71,11 @@
                 <TextBlock Name="statusBarText" Margin="-1 0 0 0">Click 'Seated' to change skeletal pipeline type!</TextBlock>
             </StatusBarItem>
         </StatusBar>
-        <Button Grid.Row="3" Grid.Column="2" Height="Auto" HorizontalAlignment="Right" Background="DarkGreen" Foreground="White" Name="EnableButton" Click="EnableButton_Click">
+        <Button Grid.Row="3" Grid.Column="3" Height="Auto" HorizontalAlignment="Right" Background="DarkGreen" Foreground="White" Name="EnableButton" Click="EnableButton_Click">
             Enable Controller
+        </Button>
+        <Button Grid.Row="3" Grid.Column="0" Height="Auto" HorizontalAlignment="Right" Background="DarkGreen" Foreground="White" Name="GameButton" Margin="0,0,200,0">
+            Game Start
         </Button>
     </Grid>
 </Window>

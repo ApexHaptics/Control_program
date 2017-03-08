@@ -45,6 +45,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private SerialComms comms;
 
         /// <summary>
+        /// The class which will run our game
+        /// </summary>
+        private GameLogic gameLogic;
+
+        /// <summary>
         /// The time of the last skeleton sending
         /// </summary>
         DateTime lastSkeletonSent = new DateTime(0);
@@ -86,7 +91,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             MarkerOverlay.Source = markerSource;
 
             // Start up comms
-            comms = new SerialComms(this.positionUpdated, EnableButton);
+            comms = new SerialComms(EnableButton);
+            comms.kinPosUpdated += this.kinPositionUpdated;
+
+            // Start our game
+            gameLogic = new GameLogic(comms, bluetoothService, this.GameButton);
+
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
@@ -243,7 +253,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Handle a position update from the forward kinematics
         /// </summary>
         /// <param name="position">The position of the robot</param>
-        private void positionUpdated(double[] position)
+        private void kinPositionUpdated(double[] position)
         {
             string stringToSend = "RPos,";
 

@@ -68,9 +68,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         bool _continue = true;
 
         /// <summary>
-        /// The action to be invoked when a new position is available from 
+        /// A delegate type for handling a kinematic position update from the robot
         /// </summary>
-        Action<double[]> handlePosUpdate;
+        public delegate void KinPosUpdateHandler(double[] position);
+
+        /// <summary>
+        /// The event fired when a new kinematic position is sent from the robot
+        /// </summary>
+        public event KinPosUpdateHandler kinPosUpdated;
 
         /// <summary>
         /// The button which enables/disables the controller
@@ -173,11 +178,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Constructor for the SerialComms class
         /// </summary>
-        /// <param name="handlePosUpdate">The handler for robot position updates</param>
         /// <param name="enableButton">The button to enable/disable the controller</param>
-        public SerialComms(Action<double[]> handlePosUpdate, Button enableButton)
+        public SerialComms(Button enableButton)
         {
-            this.handlePosUpdate = handlePosUpdate;
             this.enableButton = enableButton;
             String portName = FindDevicePort();
             if(String.IsNullOrEmpty(portName))
@@ -231,8 +234,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void HandleCommand(String command)
         {
             String[] parts = command.Split(' ');
-            byte[] x, y, z;
-            byte[] dataToSend;
             try {
                 switch (parts[0])
                 {
@@ -244,31 +245,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         // unsentArrays.Add(new byte[] { (byte)'\n', (byte)'0', (byte)'O', (byte)'\n' });
                         break;
                     case "R":
-                        x = parseFloatBytes(float.Parse(parts[1]));
-                        y = parseFloatBytes(float.Parse(parts[2]));
-                        z = parseFloatBytes(float.Parse(parts[3]));
-                        dataToSend = new byte[x.Length + y.Length + z.Length];
-                        x.CopyTo(dataToSend, 0);
-                        y.CopyTo(dataToSend, x.Length);
-                        z.CopyTo(dataToSend, x.Length + y.Length);
-                        unsentArrays.Add(ConstructSendMessage('\0', 'R', dataToSend));
-                        pendingActions.Add(null);
+                        SetTargetPosition(float.Parse(parts[1]), float.Parse(parts[2]), float.Parse(parts[3]));
                         break;
                     case "A":
-                        dataToSend = new byte[1] { byte.Parse(parts[1]) };
+                        byte[] dataToSend = new byte[1] { byte.Parse(parts[1]) };
                         unsentArrays.Add(ConstructSendMessage('\0', 'A', dataToSend));
                         pendingActions.Add(null);
                         break;
                     case "Z":
-                        x = parseFloatBytes(float.Parse(parts[1]));
-                        y = parseFloatBytes(float.Parse(parts[2]));
-                        z = parseFloatBytes(float.Parse(parts[3]));
-                        dataToSend = new byte[x.Length + y.Length + z.Length];
-                        x.CopyTo(dataToSend, 0);
-                        y.CopyTo(dataToSend, x.Length);
-                        z.CopyTo(dataToSend, x.Length + y.Length);
-                        unsentArrays.Add(ConstructSendMessage('\0', 'Z', dataToSend));
-                        pendingActions.Add(null);
+                        SetImpedance(float.Parse(parts[1]), float.Parse(parts[2]), float.Parse(parts[3]));
                         break;
                     case "E":
                     case "Enable":
@@ -295,6 +280,44 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 Console.WriteLine("Comms errorneous command");
             }
+        }
+
+        /// <summary>
+        /// Sets a target position for the end effector
+        /// </summary>
+        /// <param name="x">Position x in meters</param>
+        /// <param name="y">Position y in meters</param>
+        /// <param name="z">Position z in meters</param>
+        public void SetTargetPosition(float x, float y, float z)
+        {
+            byte[] x_bytes = parseFloatBytes(x);
+            byte[] y_bytes = parseFloatBytes(y);
+            byte[] z_bytes = parseFloatBytes(z);
+            byte[] dataToSend = new byte[x_bytes.Length + y_bytes.Length + z_bytes.Length];
+            x_bytes.CopyTo(dataToSend, 0);
+            y_bytes.CopyTo(dataToSend, x_bytes.Length);
+            z_bytes.CopyTo(dataToSend, x_bytes.Length + y_bytes.Length);
+            unsentArrays.Add(ConstructSendMessage('\0', 'R', dataToSend));
+            pendingActions.Add(null);
+        }
+
+        /// <summary>
+        /// Sets the impedance of the end effector
+        /// </summary>
+        /// <param name="m">Simulated mass</param>
+        /// <param name="b">Damping constant</param>
+        /// <param name="k">Spring constant</param>
+        public void SetImpedance(float m, float b, float k)
+        {
+            byte[] m_bytes = parseFloatBytes(m);
+            byte[] b_bytes = parseFloatBytes(b);
+            byte[] k_bytes = parseFloatBytes(k);
+            byte[] dataToSend = new byte[m_bytes.Length + b_bytes.Length + k_bytes.Length];
+            m_bytes.CopyTo(dataToSend, 0);
+            b_bytes.CopyTo(dataToSend, m_bytes.Length);
+            k_bytes.CopyTo(dataToSend, m_bytes.Length + b_bytes.Length);
+            unsentArrays.Add(ConstructSendMessage('\0', 'Z', dataToSend));
+            pendingActions.Add(null);
         }
 
         /// <summary>
@@ -444,7 +467,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     float theta2 = parseFloatBytes(data, 4);
                     float theta3 = parseFloatBytes(data, 8);
                     double[] position = Physics.physics_fkin(theta1, theta2, theta3);
-                    handlePosUpdate(position);
+                    kinPosUpdated(position);
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",
