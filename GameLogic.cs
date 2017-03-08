@@ -113,6 +113,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 while (true) // Block until we arrive at the end
                 {
                     double[] pos = positionQueue.Take();
+                    if (pos == null) return;
                     double dist_square = Math.Pow(lastCommandedPosition[0] - pos[0], 2) +
                         Math.Pow(lastCommandedPosition[1] - pos[1], 2) +
                         Math.Pow(lastCommandedPosition[2] - pos[2], 2);
@@ -128,7 +129,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void Stop()
         {
             _continue = false;
-            positionQueue.Add(lastCommandedPosition);
+            positionQueue.Add(null);
             if (gameThread != null)
             {
                 gameThread.Join();

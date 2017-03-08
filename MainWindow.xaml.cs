@@ -176,8 +176,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double[]> translationList = new List<double[]>();
             List<double> headPos = new List<double>();
             List<double> eePos = new List<double>();
-            double deltaT = 0, goggleHorizAngle = 0, goggleVertAngle = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleHorizAngle, ref goggleVertAngle, headPos, eePos);
+            List<double> transMatrix = new List<double>();
+            double deltaT = 0;
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, transMatrix, headPos, eePos);
 
             if (markerCount == 0 || (headPos.Count == 0 && eePos.Count == 0)) return;
 
@@ -185,11 +186,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             if (headPos.Count != 0)
             {
-                stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleHorizAngle + "," + goggleVertAngle + ",";
+                stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", transMatrix) + ",";
             }
             if (eePos.Count != 0)
             {
-                stringToSend = stringToSend + "EEF," + eePos[0] + "," + eePos[1] + "," + eePos[2] + ",";
+                stringToSend = stringToSend + "EEF," + String.Join(",", eePos) + ",";
             }
 
             bluetoothService.Send(stringToSend);
@@ -280,6 +281,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (null != this.comms)
             {
                 this.comms.Stop();
+            }
+            if (null != this.gameLogic)
+            {
+                this.gameLogic.Stop();
             }
         }
 

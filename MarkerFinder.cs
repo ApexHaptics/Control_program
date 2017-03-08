@@ -146,13 +146,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="rotationVectors">a list to be populated with found rotation vectors</param>
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
-        /// <param name="goggleHorizAngle">will be populated with the horizontal goggle angle (rad)</param>
-        /// <param name="goggleVertAngle">will be populated with the vertical goggle angle (rad)</param>
+        /// <param name="headTransMatrix">The estimated transformation matrix of the head [x,y,z] axis vectors</param>
         /// <param name="headPos">will be populated with the averaged position vector of the head (x,y,z)</param>
         /// <param name="eePos">will be populated with the position vector of the end effector (x,y,z)</param>
         /// <returns>The number of markers found</returns>
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
-            List<double[]> translationVectors, ref double deltaT, ref double goggleHorizAngle, ref double goggleVertAngle, List<double> headPos, List<double> eePos)
+            List<double[]> translationVectors, ref double deltaT, List<double> headTransMatrix, List<double> headPos, List<double> eePos)
         {
             if (framesProcessed++ % throttleFinding != 0) return 0;
 
@@ -193,8 +192,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 using (Mat rvecs = new Mat())
                 using (Mat tvecs = new Mat())
                 {
-                    List<double> horizHeadAngles = new List<double>();
-                    List<double> vertHeadAngles = new List<double>();
+                    List<double[]> outputTransMatrices = new List<double[]>();
                     List<double> headX = new List<double>();
                     List<double> headY = new List<double>();
                     List<double> headZ = new List<double>();
@@ -279,25 +277,31 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             }
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
-                            Matrix<double> head_normal = Math.Cos(offset_angle) * trans_z + Math.Sin(offset_angle) * trans_x;
-                            double head_normal_x = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 0 }), 0);
-                            double head_normal_y = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
-                            double head_normal_z = BitConverter.ToDouble(transMat.GetData(new int[] { 2, 2 }), 0);
-                            double horiz_angle = Math.Atan2(head_normal_x, head_normal_z);
-                            vertHeadAngles.Add(Math.Asin(head_normal_y));
-                            horiz_angle = (horiz_angle + Math.PI * 2) % (Math.PI * 2);
+                            Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z + Math.Sin(offset_angle) * trans_x;
+                            Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
+
+                            double[] outputTransMatrix = new double[] { trans_x.Data[0, 0], trans_x.Data[0, 1], trans_x.Data[0, 2],
+                                transMatrix.Data[1, 0], transMatrix.Data[1, 1], transMatrix.Data[1, 2],
+                                trans_z.Data[0, 0], trans_z.Data[0, 1], trans_z.Data[0, 2],};
+                            outputTransMatrices.Add(outputTransMatrix);
 
                             // Add head marker data to lists - nothing else should have made it here
                             headX.Add(position.Data[0, 0]);
                             headY.Add(position.Data[1, 0]);
                             headZ.Add(position.Data[2, 0]);
-                            horizHeadAngles.Add(horiz_angle);
                         }
                     }
-                    if (horizHeadAngles.Count != 0)
+                    if (outputTransMatrices.Count != 0)
                     {
-                        goggleHorizAngle = horizHeadAngles.Average();
-                        goggleVertAngle = vertHeadAngles.Average();
+                        for (int i = 0; i < 9; i++)
+                        {
+                            double total = 0;
+                            foreach (double[] outputTransMatrix in outputTransMatrices)
+                            {
+                                total += outputTransMatrix[i];
+                            }
+                            headTransMatrix.Add(total / outputTransMatrices.Count);
+                        }
                         headPos.Add(headX.Average());
                         headPos.Add(headY.Average());
                         headPos.Add(headZ.Average());
