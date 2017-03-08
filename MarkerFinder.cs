@@ -277,12 +277,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             }
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
-                            Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z + Math.Sin(offset_angle) * trans_x;
+                            // Manual rotation matrix
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
+                            Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z - Math.Sin(offset_angle) * trans_x;
 
-                            double[] outputTransMatrix = new double[] { trans_x.Data[0, 0], trans_x.Data[0, 1], trans_x.Data[0, 2],
+                            double[] outputTransMatrix = new double[] { new_x_axis.Data[0, 0], new_x_axis.Data[1, 0], new_x_axis.Data[2, 0],
                                 transMatrix.Data[1, 0], transMatrix.Data[1, 1], transMatrix.Data[1, 2],
-                                trans_z.Data[0, 0], trans_z.Data[0, 1], trans_z.Data[0, 2],};
+                                new_z_axis.Data[0, 0], new_z_axis.Data[1, 0], new_z_axis.Data[2, 0],};
                             outputTransMatrices.Add(outputTransMatrix);
 
                             // Add head marker data to lists - nothing else should have made it here
