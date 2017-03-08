@@ -167,7 +167,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double> headPos = new List<double>();
             List<double> eePos = new List<double>();
             double deltaT = 0, goggleHorizAngle = 0, goggleVertAngle = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleHorizAngle, ref googleVertAngle, headPos, eePos);
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, ref goggleHorizAngle, ref goggleVertAngle, headPos, eePos);
 
             if (markerCount == 0 || (headPos.Count == 0 && eePos.Count == 0)) return;
 
@@ -175,7 +175,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             if (headPos.Count != 0)
             {
-                stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleHorizAngle + "," + googleVertAngle + ",";
+                stringToSend = stringToSend + "HED," + headPos[0] + "," + headPos[1] + "," + headPos[2] + "," + goggleHorizAngle + "," + goggleVertAngle + ",";
             }
             if (eePos.Count != 0)
             {
