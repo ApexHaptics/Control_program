@@ -329,10 +329,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                         if(prevHeadPos != null)
                         {
-                            headPos = (List<double>)headPos.Zip(prevHeadPos,
-                                (x, y) => x*expFilterConst + y*(1- expFilterConst));
-                            headRotMatrix = (List<double>)headRotMatrix.Zip(prevHeadRotMatrix,
-                                (x, y) => x * expFilterConst + y * (1 - expFilterConst));
+                            headPos = headPos.Zip(prevHeadPos, (x, y) => x*expFilterConst + y*(1- expFilterConst)).ToList();
+                            headRotMatrix = headRotMatrix.Zip(prevHeadRotMatrix, (x, y) => x * expFilterConst + y * (1 - expFilterConst)).ToList();
                         }
                         prevHeadPos = headPos;
                         prevHeadRotMatrix = headRotMatrix;
