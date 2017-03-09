@@ -90,6 +90,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private const float MarkerWidth = 0.07f;
 
+        /// <summary>
+        /// What the marker IDs actually correspond to
+        /// </summary>
         private enum MarkerTypes
         {
             HeadLeft = 0,
@@ -97,6 +100,21 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             HeadRight = 2,
             EndEffector = 3,
         }
+
+        /// <summary>
+        /// The previous head rotation matrix
+        /// </summary>
+        List<double> prevHeadRotMatrix = null;
+
+        /// <summary>
+        /// The previous head position vector
+        /// </summary>
+        List<double> prevHeadPos = null;
+
+        /// <summary>
+        /// The constant at which our exponential filter decreases
+        /// </summary>
+        private const float expFilterConst = 0.5f;
 
         /// <summary>
         /// Constructor for the MarkerFinder class
@@ -146,12 +164,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="rotationVectors">a list to be populated with found rotation vectors</param>
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
-        /// <param name="headTransMatrix">The estimated transformation matrix of the head [x,y,z] axis vectors</param>
+        /// <param name="headRotMatrix">The estimated rotation matrix of the head [x,y,z] axis vectors</param>
         /// <param name="headPos">will be populated with the averaged position vector of the head (x,y,z)</param>
         /// <param name="eePos">will be populated with the position vector of the end effector (x,y,z)</param>
         /// <returns>The number of markers found</returns>
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
-            List<double[]> translationVectors, ref double deltaT, List<double> headTransMatrix, List<double> headPos, List<double> eePos)
+            List<double[]> translationVectors, ref double deltaT, List<double> headRotMatrix, List<double> headPos, List<double> eePos)
         {
             if (framesProcessed++ % throttleFinding != 0) return 0;
 
@@ -192,7 +210,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 using (Mat rvecs = new Mat())
                 using (Mat tvecs = new Mat())
                 {
-                    List<double[]> outputTransMatrices = new List<double[]>();
+                    List<double[]> outputRotMatrices = new List<double[]>();
                     List<double> headX = new List<double>();
                     List<double> headY = new List<double>();
                     List<double> headZ = new List<double>();
@@ -281,12 +299,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
                             Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z - Math.Sin(offset_angle) * trans_x;
 
-                            double[] outputTransMatrix = new double[] {
+                            double[] outputRotMatrix = new double[] {
                                 new_x_axis.Data[0, 0], transMatrix.Data[1, 0], new_z_axis.Data[0, 0],
                                 new_x_axis.Data[1, 0], transMatrix.Data[1, 1], new_z_axis.Data[1, 0],
                                 new_x_axis.Data[2, 0], transMatrix.Data[1, 2], new_z_axis.Data[2, 0],
                             };
-                            outputTransMatrices.Add(outputTransMatrix);
+                            outputRotMatrices.Add(outputRotMatrix);
 
                             // Add head marker data to lists - nothing else should have made it here
                             headX.Add(position.Data[0, 0]);
@@ -294,20 +312,30 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             headZ.Add(position.Data[2, 0]);
                         }
                     }
-                    if (outputTransMatrices.Count != 0)
+                    if (outputRotMatrices.Count != 0)
                     {
                         for (int i = 0; i < 9; i++)
                         {
                             double total = 0;
-                            foreach (double[] outputTransMatrix in outputTransMatrices)
+                            foreach (double[] outputTransMatrix in outputRotMatrices)
                             {
                                 total += outputTransMatrix[i];
                             }
-                            headTransMatrix.Add(total / outputTransMatrices.Count);
+                            headRotMatrix.Add(total / outputRotMatrices.Count);
                         }
                         headPos.Add(headX.Average());
                         headPos.Add(headY.Average());
                         headPos.Add(headZ.Average());
+
+                        if(prevHeadPos != null)
+                        {
+                            headPos = (List<double>)headPos.Zip(prevHeadPos,
+                                (x, y) => x*expFilterConst + y*(1- expFilterConst));
+                            headRotMatrix = (List<double>)headRotMatrix.Zip(prevHeadRotMatrix,
+                                (x, y) => x * expFilterConst + y * (1 - expFilterConst));
+                        }
+                        prevHeadPos = headPos;
+                        prevHeadRotMatrix = headRotMatrix;
                     }
                 }
 
