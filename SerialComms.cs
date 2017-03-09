@@ -49,7 +49,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// The string passed will be the packet data. This can be transformed into a byte array through BlockCopy operations
         /// Ex: delegate(string s){ Console.WriteLine("DELEGATE SUCESSFULLY INVOKED"); }
         /// </summary>
-        BlockingCollection<Action<String>> pendingActions = new BlockingCollection<Action<String>>(new ConcurrentQueue<Action<String>>());
+        BlockingCollection<Action<byte[]>> pendingActions = new BlockingCollection<Action<byte[]>>(new ConcurrentQueue<Action<byte[]>>());
 
         /// <summary>
         /// A timer to make sure a heartbeat is received every second
@@ -96,31 +96,31 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             /// <summary>
             /// A byte representing the packet number
             /// </summary>
-            public char tag;
+            public byte tag;
 
             /// <summary>
             /// The packet type byte
             /// </summary>
-            public char id;
+            public byte id;
 
             /// <summary>
             /// The data in the packet
             /// </summary>
-            public String data;
+            public byte[] data;
 
             /// <summary>
             /// The message either read or written to comms
             /// </summary>
-            public String message;
+            public byte[] message;
 
             /// <summary>
             /// Constructor when reading
             /// </summary>
             /// <param name="serialLine">The serial line read from the device</param>
-            public RobotPacket(String serialLine)
+            public RobotPacket(byte[] serialLine)
             {
                 int index = 0;
-                if(serialLine[index] == '≥')
+                if(serialLine[index] == 0xF2)
                 {
                     synchronous = false;
                     index++;
@@ -131,10 +131,28 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 }
                 tag = serialLine[index++];
                 id = serialLine[index++];
-                data = serialLine.Substring(index);
+                List<byte> dataList = new List<byte>();
+                for(int i = index; i < serialLine.Length; i++)
+                {
+                    if(serialLine[i] == 0x10 && serialLine.Length > i+1)
+                    {
+                        if(serialLine[i+1] == 0x8A)
+                        {
+                            i++;
+                            dataList.Add(0x0A);
+                            continue;
+                        }
+                        else if (serialLine[i + 1] == 0x90)
+                        {
+                            i++;
+                            dataList.Add(0x10);
+                            continue;
+                        }
+                    }
+                    dataList.Add(serialLine[i]);
+                }
                 message = serialLine;
-
-                data = data.Replace("\x10\x8A", "\x0A").Replace("\x10\x90", "\x10");
+                data = dataList.ToArray();
             }
         }
 
@@ -239,6 +257,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     case "reset":
                         unsentArrays.Add(new byte[]{ (byte)'\n', (byte)'0', (byte)'M', (byte)'\n' });
+                        pendingActions.Add(null);
                         break;
                     case "erase":
                         // We're not doing this yet
@@ -323,8 +342,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Handler for enable/disable commands
         /// </summary>
-        /// <param name="s">Unused</param>
-        void enablerHandler(String s)
+        /// <param name="b">Unused</param>
+        void enablerHandler(byte[] b)
         {
             Action a = delegate {
                 if ((string)enableButton.Content == "Enable Controller")
@@ -408,24 +427,32 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private void ReadThread()
         {
-            String line;
             RobotPacket packet;
+            List<byte> emptyLine = (new byte[] { 0xF2, 0 }).ToList();
+            List<byte> roboLine = (new byte[] { 0xF2, (byte)'r', (byte)'o',
+                (byte)'b', (byte)'o', (byte)'!'}).ToList();
             while (_continue)
             {
                 try
                 {
-                    line = serialPort.ReadLine();
-                    if (String.IsNullOrEmpty(line) || line == "≥\0") continue;
-                    if (line == "≥robo!")
+                    List<byte> line = new List<byte>();
+                    byte b = (byte)serialPort.ReadByte();
+                    while(b != '\n')
+                    {
+                        line.Add(b);
+                        b = (byte)serialPort.ReadByte();
+                    }
+                    if (line.Count == 0 || line.SequenceEqual(emptyLine)) continue;
+                    if (line.SequenceEqual(roboLine))
                     {
                         heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
                         continue;
                     }
-                    packet = new RobotPacket(line);
+                    packet = new RobotPacket(line.ToArray());
 
                     if(packet.synchronous)
                     {
-                        Action<string> action = pendingActions.Take();
+                        Action<byte[]> action = pendingActions.Take();
                         if(action != null)
                         {
                             action(packet.data);
@@ -455,17 +482,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             switch(packet.id)
             {
-                case 'p':
+                case (byte)'p':
                     // Console.WriteLine("MCU print: " + packet.data);
                     // Ignoring for now due to large volume of prints
                     break;
-                case 'A':
+                case (byte)'A':
                     // Packet content should be 3 floats theta1, theta2, theta3
-                    byte[] data = new byte[12];
-                    Buffer.BlockCopy(packet.data.ToCharArray(), 0, data, 0, data.Length);
-                    float theta1 = parseFloatBytes(data, 0);
-                    float theta2 = parseFloatBytes(data, 4);
-                    float theta3 = parseFloatBytes(data, 8);
+                    float theta1 = parseFloatBytes(packet.data, 0);
+                    float theta2 = parseFloatBytes(packet.data, 4);
+                    float theta3 = parseFloatBytes(packet.data, 8);
                     double[] position = Physics.physics_fkin(theta1, theta2, theta3);
                     kinPosUpdated(position);
                     break;

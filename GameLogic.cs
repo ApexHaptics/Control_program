@@ -158,7 +158,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void GameLoop()
         {
             lastRecordedPosition = positionQueue.Take();
-            lastPositionTime = new DateTime();
+            lastPositionTime = DateTime.Now;
             float x = (float)lastRecordedPosition[0],
                 y = (float)lastRecordedPosition[1],
                 z = (float)lastRecordedPosition[2];
@@ -198,7 +198,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 Action a = delegate {
                     gameButton.Content = "Skip";
                     gameButton.IsEnabled = true;
-                    gameButton.Background = System.Windows.Media.Brushes.DarkGray;
+                    gameButton.Background = System.Windows.Media.Brushes.DarkRed;
                 };
                 gameButton.Dispatcher.Invoke(a);
                 for (int i = 0; i < 20; i++)
@@ -228,11 +228,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 double dist_square = Math.Pow(lastCommandedPosition[0] - pos[0], 2) +
                     Math.Pow(lastCommandedPosition[1] - pos[1], 2) +
                     Math.Pow(lastCommandedPosition[2] - pos[2], 2);
-                DateTime now = new DateTime();
+                DateTime now = DateTime.Now;
                 double instant_velocity = Math.Pow(lastRecordedPosition[0] - pos[0], 2) +
                     Math.Pow(lastRecordedPosition[1] - pos[1], 2) +
                     Math.Pow(lastRecordedPosition[2] - pos[2], 2) /
                     Math.Pow((lastPositionTime - now).Milliseconds, 2) * 1000000;
+                lastRecordedPosition = pos;
                 lastPositionTime = now;
                 if (dist_square < dist_thresh_square && instant_velocity < epsilon_square) break;
             }

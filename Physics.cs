@@ -26,15 +26,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             const double wP = uP / 2;
 
             double y1 = -wB - L * Math.Cos(th1) + uP;
-            double z1 = -L * Math.Sin(th1);
+            double z1 = L * Math.Sin(th1);
 
             double x2 = 0.5 * (SQRT3 * (wB + L * Math.Cos(th2)) - sP);
             double y2 = 0.5 * (wB + L * Math.Cos(th2)) - wP;
-            double z2 = -L * Math.Sin(th2);
+            double z2 = L * Math.Sin(th2);
 
             double x3 = 0.5 * (-SQRT3 * (wB + L * Math.Cos(th3)) + sP);
             double y3 = 0.5 * (wB + L * Math.Cos(th3)) - wP;
-            double z3 = -L * Math.Sin(th3);
+            double z3 = L * Math.Sin(th3);
 
             double dnm = (y2 - y1) * x3 - (y3 - y1) * x2;
 

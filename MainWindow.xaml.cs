@@ -52,12 +52,34 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The time of the last skeleton sending
         /// </summary>
-        DateTime lastSkeletonSent = new DateTime(0);
+        private DateTime lastSkeletonSent = new DateTime(0);
 
         /// <summary>
         /// The time of the last skeleton sending
         /// </summary>
-        DateTime lastPosSent = new DateTime(0);
+        private DateTime lastPosSent = new DateTime(0);
+
+        /// <summary>
+        /// Constants for 1 euro filter
+        /// </summary>
+        private const double euroMinCutoff = 1, euroBeta = 100;
+
+        private OneEuroFilter filterLeftX = new OneEuroFilter(euroMinCutoff, euroBeta),
+            filterLeftY = new OneEuroFilter(euroMinCutoff, euroBeta),
+            filterLeftZ = new OneEuroFilter(euroMinCutoff, euroBeta),
+            filterRightX = new OneEuroFilter(euroMinCutoff, euroBeta),
+            filterRightY = new OneEuroFilter(euroMinCutoff, euroBeta),
+            filterRightZ = new OneEuroFilter(euroMinCutoff, euroBeta);
+
+        /// <summary>
+        /// DrawingGroup used to draw euro filter results
+        /// </summary>
+        private DrawingGroup euroDrawingGroup;
+
+        /// <summary>
+        /// Brush used to draw euro filtered points
+        /// </summary>
+        private readonly System.Windows.Media.Brush euroOutput = System.Windows.Media.Brushes.Magenta;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -80,14 +102,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             // Create the drawing group we'll use for drawing
             DrawingGroup drawingGroup = new DrawingGroup();
+            euroDrawingGroup = new DrawingGroup();
             DrawingGroup markerDrawingGroup = new DrawingGroup();
 
             // Create image sources that we can use in our image controls
             ImageSource imageSource = new DrawingImage(drawingGroup);
+            ImageSource euroSource = new DrawingImage(euroDrawingGroup);
             ImageSource markerSource = new DrawingImage(markerDrawingGroup);
 
             // Display the drawing using our image controls
             Image.Source = imageSource;
+            EuroOverlay.Source = euroSource;
             MarkerOverlay.Source = markerSource;
 
             // Start up comms
@@ -231,18 +256,55 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 string stringToSend = "JLoc,";
 
                 DateTime tempNow = DateTime.Now;
-                stringToSend = stringToSend + (int)tempNow.Subtract(lastSkeletonSent).TotalMilliseconds + ",";
+                int deltaT = (int)tempNow.Subtract(lastSkeletonSent).TotalMilliseconds;
+                stringToSend = stringToSend + deltaT + ",";
                 lastSkeletonSent = tempNow;
+                double rate = 1000 / (double)deltaT;
 
-                // Order: SC, HD, WL, HL, WR, HR
-                foreach (Joint joint in skeletonToSend.Joints)
+                using (DrawingContext dc = this.euroDrawingGroup.Open())
                 {
-                    stringToSend = stringToSend + "JNT," +
-                        (int)joint.JointType + "," +
-                        (int)joint.TrackingState + "," +
-                        joint.Position.X + "," +
-                        joint.Position.Y + "," +
-                        joint.Position.Z + ",";
+                    dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, 640.0f, 480.0f));
+                    // Order: SC, HD, WL, HL, WR, HR
+                    foreach (Joint joint in skeletonToSend.Joints)
+                    {
+                        stringToSend = stringToSend + "JNT," +
+                            (int)joint.JointType + "," +
+                            (int)joint.TrackingState + ",";
+                        if (joint.JointType == JointType.HandRight && deltaT > 0)
+                        {
+                            SkeletonPoint euroRightHand = new SkeletonPoint();
+                            euroRightHand.X = (float)filterRightX.Filter(joint.Position.X, rate);
+                            euroRightHand.Y = (float)filterRightY.Filter(joint.Position.Y, rate);
+                            euroRightHand.Z = (float)filterRightZ.Filter(joint.Position.Z, rate);
+                            stringToSend = stringToSend + euroRightHand.X + "," + euroRightHand.Y + "," + euroRightHand.Z + ",";
+                            DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroRightHand, DepthImageFormat.Resolution640x480Fps30);
+                            System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
+                            dc.DrawEllipse(this.euroOutput,
+                                null,
+                                cornerPoint,
+                                3,3);
+                        }
+                        else if (joint.JointType == JointType.HandLeft && deltaT > 0)
+                        {
+                            SkeletonPoint euroLeftHand = new SkeletonPoint();
+                            euroLeftHand.X = (float)filterLeftX.Filter(joint.Position.X, rate);
+                            euroLeftHand.Y = (float)filterLeftY.Filter(joint.Position.Y, rate);
+                            euroLeftHand.Z = (float)filterLeftZ.Filter(joint.Position.Z, rate);
+                            stringToSend = stringToSend + euroLeftHand.X + "," + euroLeftHand.Y + "," + euroLeftHand.Z + ",";
+                            DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroLeftHand, DepthImageFormat.Resolution640x480Fps30);
+                            System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
+                            dc.DrawEllipse(this.euroOutput,
+                                null,
+                                cornerPoint,
+                                3, 3);
+                        }
+                        else
+                        {
+                            stringToSend = stringToSend + joint.Position.X + "," +
+                                joint.Position.Y + "," +
+                                joint.Position.Z + ",";
+                        }
+                    }
                 }
                 bluetoothService.Send(stringToSend);
             }
