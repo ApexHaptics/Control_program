@@ -64,6 +64,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private const double euroMinCutoff = 1, euroBeta = 100;
 
+        /// <summary>
+        /// One euro filters
+        /// </summary>
         private OneEuroFilter filterLeftX = new OneEuroFilter(euroMinCutoff, euroBeta),
             filterLeftY = new OneEuroFilter(euroMinCutoff, euroBeta),
             filterLeftZ = new OneEuroFilter(euroMinCutoff, euroBeta),

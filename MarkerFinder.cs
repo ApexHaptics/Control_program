@@ -43,11 +43,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         //private const int throttleFinding = 1;
 
         /// <summary>
-        /// Total number of frames processed
-        /// </summary>
-        private int framesProcessed = 0;
-
-        /// <summary>
         /// Drawing group for skeleton rendering output
         /// </summary>
         private DrawingGroup drawingGroup;
@@ -104,12 +99,19 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The previous head rotation matrix
         /// </summary>
-        List<double> prevHeadRotMatrix = null;
+        private List<double> prevHeadRotMatrix = null;
 
         /// <summary>
-        /// The previous head position vector
+        /// Constants for 1 euro filter
         /// </summary>
-        List<double> prevHeadPos = null;
+        private const double euroMinCutoff = 0.001, euroBeta = 10;
+
+        /// <summary>
+        /// Filters for head position
+        /// </summary>
+        private OneEuroFilter[] headFilters = { new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta) };
 
         /// <summary>
         /// The constant at which our exponential filter decreases
@@ -323,16 +325,20 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             }
                             headRotMatrix.Add(total / outputRotMatrices.Count);
                         }
-                        headPos.Add(headX.Average());
-                        headPos.Add(headY.Average());
-                        headPos.Add(headZ.Average());
+                        List<double> unfilteredHeadPos = new List<double>();
+                        unfilteredHeadPos.Add(headX.Average());
+                        unfilteredHeadPos.Add(headY.Average());
+                        unfilteredHeadPos.Add(headZ.Average());
 
-                        if(prevHeadPos != null)
+                        double rate = 1000 / deltaT;
+                        foreach(double pos in unfilteredHeadPos.Zip(headFilters, (x, y) => y.Filter(x, rate)))
                         {
-                            headPos = headPos.Zip(prevHeadPos, (x, y) => x*expFilterConst + y*(1- expFilterConst)).ToList();
+                            headPos.Add(pos);
+                        }
+                        if (prevHeadRotMatrix != null)
+                        {
                             headRotMatrix = headRotMatrix.Zip(prevHeadRotMatrix, (x, y) => x * expFilterConst + y * (1 - expFilterConst)).ToList();
                         }
-                        prevHeadPos = headPos;
                         prevHeadRotMatrix = headRotMatrix;
                     }
                 }
