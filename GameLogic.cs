@@ -13,22 +13,27 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The radius of our workspace
         /// </summary>
-        private const float work_radius = 0.2f;
+        private const float work_radius = 0.33f;
 
         /// <summary>
         /// The lower z of our workspace
         /// </summary>
-        private const float work_z_low = 0.5f;
+        private const float work_z_low = 0.79f;
 
         /// <summary>
-        /// The upper z of our workspace
+        /// The interaction z of our workspace, halfway between 1.04 and 0.79
         /// </summary>
-        private const float work_z_high = 1f;
+        private const float work_z_mid = 0.92f;
 
         /// <summary>
         /// The distance before we consider the target "reached" (currently 0.05^2)
         /// </summary>
         private const double dist_thresh_square = 0.0025;
+
+        /// <summary>
+        /// The epsilon below which the velocity is considered settled (0.01 m/s)^2
+        /// </summary>
+        private const double epsilon_square = 0.0001;
 
         /// <summary>
         /// The PRNG for this class
@@ -51,6 +56,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private Thread gameThread;
 
         /// <summary>
+        /// The button which will be used to start the game and skip interaction phases
+        /// </summary>
+        private Button gameButton;
+
+        /// <summary>
+        /// If true we should skip the current interaction phase
+        /// </summary>
+        private bool skipInteraction = false;
+
+        /// <summary>
         /// A queue of arrived positions to compare with the demanded position
         /// </summary>
         BlockingCollection<double[]> positionQueue = new BlockingCollection<double[]>(new ConcurrentQueue<double[]>());
@@ -59,6 +74,30 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// The last position the robot was told to move to
         /// </summary>
         private double[] lastCommandedPosition;
+
+        /// <summary>
+        /// The last position the robot was recorded at
+        /// </summary>
+        private double[] lastRecordedPosition;
+
+        /// <summary>
+        /// The time of lastRecordedPosition
+        /// </summary>
+        DateTime lastPositionTime;
+
+        /// <summary>
+        /// Impedance values to be used by the robot {m,b,k}
+        /// </summary>
+        float[][] impedanceValues = new float[][]
+        {
+            new float[]{10, 60, 0},
+            new float[]{0, 50, 500},
+        };
+
+        /// <summary>
+        /// The current impendence selected
+        /// </summary>
+        int currentImpendenceIndex = 0;
 
         /// <summary>
         /// Whether threads should continue
@@ -77,6 +116,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             comms.kinPosUpdated += Comms_kinPosUpdated;
             this.btService = btService;
             gameThread = new Thread(this.GameLoop);
+            this.gameButton = gameButton;
             gameButton.Click += GameButton_Click;
         }
 
@@ -85,7 +125,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private void GameButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            this.gameThread.Start();
+            if (!gameThread.IsAlive)
+            {
+                this.gameThread.Start();
+            }
+            else
+            {
+                skipInteraction = true;
+            }
+            gameButton.Content = "In progress";
+            gameButton.IsEnabled = false;
+            gameButton.Background = System.Windows.Media.Brushes.DarkGray;
         }
 
         /// <summary>
@@ -102,24 +152,82 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private void GameLoop()
         {
-            float x, y, z;
+            lastRecordedPosition = positionQueue.Take();
+            lastPositionTime = new DateTime();
+            float x = (float)lastRecordedPosition[0],
+                y = (float)lastRecordedPosition[1],
+                z = (float)lastRecordedPosition[2];
+
             while (_continue)
             {
-                MakeRandomCirclePoints(out x, out y);
-                z = work_z_low;
-                lastCommandedPosition = new double[] { x, y, z };
-                comms.SetTargetPosition(x, y, z);
+                // Set impedance to special uninteractable value while moving
+                comms.SetImpedance(0, 0, 0);
 
-                while (true) // Block until we arrive at the end
+                // Step 1: go down  to low z
+                z = work_z_low;
+                MoveToPoint(x, y, z);
+                if (!_continue) return;
+
+                // Step 2: Random x, y and still low z
+                MakeRandomCirclePoints(out x, out y);
+                MoveToPoint(x, y, z);
+                if (!_continue) return;
+                // TODO: We reached it - inform the display
+
+                // Step 3: Set impedance
+                comms.SetImpedance(impedanceValues[currentImpendenceIndex][0],
+                    impedanceValues[currentImpendenceIndex][1],
+                    impedanceValues[currentImpendenceIndex][2]);
+                currentImpendenceIndex = (currentImpendenceIndex + 1) % impedanceValues.Length;
+                // TODO: Inform display of impedance
+
+                // Step 4: Interaction z, previous x,y
+                z = work_z_mid;
+                MoveToPoint(x, y, z);
+                if (!_continue) return;
+                // TODO: We reached it - inform the display
+
+                // Step 5: Wait 10s or for button pressed
+                Action a = delegate {
+                    gameButton.Content = "Skip";
+                    gameButton.IsEnabled = true;
+                    gameButton.Background = System.Windows.Media.Brushes.DarkGray;
+                };
+                gameButton.Dispatcher.Invoke(a);
+                for (int i = 0; i < 20; i++)
                 {
-                    double[] pos = positionQueue.Take();
-                    if (pos == null) return;
-                    double dist_square = Math.Pow(lastCommandedPosition[0] - pos[0], 2) +
-                        Math.Pow(lastCommandedPosition[1] - pos[1], 2) +
-                        Math.Pow(lastCommandedPosition[2] - pos[2], 2);
-                    if (dist_square < dist_thresh_square) break;
+                    Thread.Sleep(500);
+                    if (skipInteraction) break;
                 }
-                // We reached it: inform the display
+                skipInteraction = false;
+            }
+        }
+
+        /// <summary>
+        /// Move the end effector to a point and blocks until it arrives
+        /// </summary>
+        /// <param name="x">X pos</param>
+        /// <param name="y">Y pos</param>
+        /// <param name="z">Z pos</param>
+        private void MoveToPoint(float x, float y, float z)
+        {
+            lastCommandedPosition = new double[] { x, y, z };
+            comms.SetTargetPosition(x, y, z);
+
+            while (true)
+            {
+                double[] pos = positionQueue.Take();
+                if (pos == null) return;
+                double dist_square = Math.Pow(lastCommandedPosition[0] - pos[0], 2) +
+                    Math.Pow(lastCommandedPosition[1] - pos[1], 2) +
+                    Math.Pow(lastCommandedPosition[2] - pos[2], 2);
+                DateTime now = new DateTime();
+                double instant_velocity = Math.Pow(lastRecordedPosition[0] - pos[0], 2) +
+                    Math.Pow(lastRecordedPosition[1] - pos[1], 2) +
+                    Math.Pow(lastRecordedPosition[2] - pos[2], 2) /
+                    Math.Pow((lastPositionTime - now).Milliseconds, 2) * 1000000;
+                lastPositionTime = now;
+                if (dist_square < dist_thresh_square && instant_velocity < epsilon_square) break;
             }
         }
 
@@ -130,7 +238,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             _continue = false;
             positionQueue.Add(null);
-            if (gameThread != null)
+            if (gameThread != null && gameThread.IsAlive)
             {
                 gameThread.Join();
             }
