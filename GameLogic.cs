@@ -36,6 +36,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private const double epsilon_square = 0.0001;
 
         /// <summary>
+        /// How long to delay after certain end effector movements
+        /// </summary>
+        private int movementDelay = 500;
+
+        /// <summary>
         /// The PRNG for this class
         /// </summary>
         private Random rand = new Random();
@@ -163,16 +168,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 // Set impedance to special uninteractable value while moving
                 comms.SetImpedance(0, 0, 0);
 
-                // Step 1: go down  to low z
+                // Step 1: Go down to low z
                 z = work_z_low;
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
+                Thread.Sleep(movementDelay);
 
                 // Step 2: Random x, y and still low z
                 MakeRandomCirclePoints(out x, out y);
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
                 // TODO: We reached it - inform the display
+                Thread.Sleep(movementDelay);
 
                 // Step 3: Set impedance
                 comms.SetImpedance(impedanceValues[currentImpendenceIndex][0],
@@ -196,8 +203,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 gameButton.Dispatcher.Invoke(a);
                 for (int i = 0; i < 20; i++)
                 {
-                    Thread.Sleep(500);
                     if (skipInteraction) break;
+                    Thread.Sleep(500);
                 }
                 skipInteraction = false;
             }
