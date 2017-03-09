@@ -40,7 +40,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Marker finding will only run one in throttleFinding times
         /// </summary>
-        private const int throttleFinding = 12;
+        //private const int throttleFinding = 1;
 
         /// <summary>
         /// Total number of frames processed
@@ -171,7 +171,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
             List<double[]> translationVectors, ref double deltaT, List<double> headRotMatrix, List<double> headPos, List<double> eePos)
         {
-            if (framesProcessed++ % throttleFinding != 0) return 0;
+            //if (framesProcessed++ % throttleFinding != 0) return 0;
 
             using (VectorOfInt ids = new VectorOfInt())
             using (VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF())
