@@ -207,7 +207,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     Thread.Sleep(500);
                 }
                 skipInteraction = false;
-            }
+                a = delegate {
+                    gameButton.Content = "In progress";
+                    gameButton.IsEnabled = false;
+                    gameButton.Background = System.Windows.Media.Brushes.DarkGray;
+                };
+                gameButton.Dispatcher.Invoke(a);
+        }
         }
 
         /// <summary>
