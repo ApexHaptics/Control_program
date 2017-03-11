@@ -101,6 +101,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         };
 
         /// <summary>
+        /// Possible stages of game logic
+        /// </summary>
+        enum GameState
+        {
+            MovingToXY,
+            ImpedanceSet,
+            PositionReached,
+        }
+
+        /// <summary>
         /// The current impendence selected
         /// </summary>
         int currentImpendenceIndex = 0;
@@ -170,6 +180,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 // Set impedance to special uninteractable value while moving
                 comms.SetImpedance(0, 0, 0);
+                InformDisplayOfGameState(GameState.MovingToXY);
 
                 // Step 1: Go down to low z
                 z = work_z_low;
@@ -181,21 +192,20 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 MakeRandomCirclePoints(out x, out y);
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
-                // TODO: We reached it - inform the display
                 Thread.Sleep(movementDelay);
 
                 // Step 3: Set impedance
                 comms.SetImpedance(impedanceValues[currentImpendenceIndex][0],
                     impedanceValues[currentImpendenceIndex][1],
                     impedanceValues[currentImpendenceIndex][2]);
+                InformDisplayOfGameState(GameState.ImpedanceSet, currentImpendenceIndex);
                 currentImpendenceIndex = (currentImpendenceIndex + 1) % impedanceValues.Length;
-                // TODO: Inform display of impedance
 
                 // Step 4: Interaction z, previous x,y
                 z = work_z_mid;
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
-                // TODO: We reached it - inform the display
+                InformDisplayOfGameState(GameState.PositionReached);
 
                 // Step 5: Wait 10s or for button pressed
                 Action a = delegate {
@@ -219,6 +229,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 };
                 gameButton.Dispatcher.Invoke(a);
             }
+        }
+
+        /// <summary>
+        /// Informs the display of the current stage in game logic
+        /// </summary>
+        /// <param name="state">The current game state enum</param>
+        /// <param name="data">An integer which contains game state data</param>
+        private void InformDisplayOfGameState(GameState state, int data = 0)
+        {
+            string stringToSend = "GStt," + (int)state + "," + data;
+            btService.Send(stringToSend);
         }
 
         /// <summary>
