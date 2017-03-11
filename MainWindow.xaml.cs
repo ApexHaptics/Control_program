@@ -125,6 +125,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             // Start our game
             gameLogic = new GameLogic(comms, bluetoothService, this.GameButton);
 
+            // Start up the marker finder
+            this.finder = new MarkerFinder(markerDrawingGroup);
+
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
@@ -141,13 +144,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
             if (null != this.sensor)
             {
-                this.renderer = new SkeletonRenderer(drawingGroup, this.sensor.CoordinateMapper);
-                this.finder = new MarkerFinder(markerDrawingGroup);
-
                 // Turn on the skeleton stream to receive skeleton frames
+                this.renderer = new SkeletonRenderer(drawingGroup, this.sensor.CoordinateMapper);
                 this.sensor.SkeletonStream.Enable();
-
-                // Add an event handler to be called whenever there is new color frame data
                 this.sensor.SkeletonFrameReady += this.SensorSkeletonFrameReady;
 
                 // Enable the camera to track the markers
@@ -264,6 +263,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 lastSkeletonSent = tempNow;
                 double rate = 1000 / (double)deltaT;
 
+                //foreach (Joint joint in skeletonToSend.Joints)
+                //{
+                //    stringToSend = stringToSend + "JNT," +
+                //        (int)joint.JointType + "," +
+                //        (int)joint.TrackingState + ",";
+                //    stringToSend = stringToSend + joint.Position.X + "," +
+                //        joint.Position.Y + "," +
+                //        joint.Position.Z + ",";
+                //}
+
                 using (DrawingContext dc = this.euroDrawingGroup.Open())
                 {
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, 640.0f, 480.0f));
@@ -285,7 +294,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             dc.DrawEllipse(this.euroOutput,
                                 null,
                                 cornerPoint,
-                                3,3);
+                                3, 3);
                         }
                         else if (joint.JointType == JointType.HandLeft && deltaT > 0)
                         {

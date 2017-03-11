@@ -50,7 +50,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The dictionary used to detect markers
         /// </summary>
-        private readonly Dictionary dictionary = new Dictionary(Dictionary.PredefinedDictionaryName.Dict5X5_100);
+        private readonly Dictionary dictionary = new Dictionary(Dictionary.PredefinedDictionaryName.Dict4X4_50);
 
         /// <summary>
         /// Brush used to draw marker center point
@@ -149,7 +149,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             }
 
             // This code generates all the test markers. Uncomment to generate
-            //for (int i = 0; i < 100; i++)
+            //for (int i = 0; i < 50; i++)
             //{
             //    Mat markerImage = new Mat();
             //    ArucoInvoke.DrawMarker(dictionary, i, 200, markerImage);
@@ -344,21 +344,24 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 }
 
                 // Draw the markers
-                PointF[][] outArray = corners.ToArrayOfArray();
                 using (DrawingContext dc = this.drawingGroup.Open())
                 {
+                    PointF[][] outArray = corners.ToArrayOfArray();
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
-                    foreach (PointF[] markerArray in outArray)
+                    for (int i = 0; i < outArray.Length; i++)
                     {
-                        for (int i = 0; i < markerArray.Length; i++)
+                        if (!Enum.IsDefined(typeof(MarkerTypes), ids[i])) continue;
+
+                        PointF[] markerArray = outArray[i];
+                        for (int j = 0; j < markerArray.Length; j++)
                         {
                             // Redo mirroring
-                            markerArray[i].X = cImgWidth - markerArray[i].X;
+                            markerArray[j].X = cImgWidth - markerArray[j].X;
 
                             // From front view, top right = blue = markerarray[0]. Rest are CCW
-                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[i].X/2, (int)markerArray[i].Y/2);
+                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[j].X/2, (int)markerArray[j].Y/2);
                             dc.DrawEllipse(
-                                this.cornerBrushes[i],
+                                this.cornerBrushes[j],
                                 null,
                                 cornerPoint,
                                 CornerThickness,

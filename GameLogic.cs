@@ -97,6 +97,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             new float[]{10, 60, 0},
             new float[]{0, 50, 500},
+            new float[]{10, 40, 150},
         };
 
         /// <summary>
@@ -158,6 +159,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void GameLoop()
         {
             lastRecordedPosition = positionQueue.Take();
+            if (lastRecordedPosition == null) return;
+
             lastPositionTime = DateTime.Now;
             float x = (float)lastRecordedPosition[0],
                 y = (float)lastRecordedPosition[1],
@@ -206,6 +209,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     if (skipInteraction) break;
                     Thread.Sleep(500);
                 }
+
+                // Wait over. Prepare for next loop
                 skipInteraction = false;
                 a = delegate {
                     gameButton.Content = "In progress";
@@ -213,7 +218,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     gameButton.Background = System.Windows.Media.Brushes.DarkGray;
                 };
                 gameButton.Dispatcher.Invoke(a);
-        }
+            }
         }
 
         /// <summary>
