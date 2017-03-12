@@ -12,6 +12,11 @@ using Emgu.CV.Structure;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
+using System.Windows.Interop;
+using System.Windows;
+using System.Windows.Media.Imaging;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace Microsoft.Samples.Kinect.SkeletonBasics
 {
@@ -43,7 +48,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         //private const int throttleFinding = 1;
 
         /// <summary>
-        /// Drawing group for skeleton rendering output
+        /// Drawing group for skeleton rendering marker output
         /// </summary>
         private DrawingGroup drawingGroup;
 
@@ -63,7 +68,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Thickness of marker center ellipse
         /// </summary>
-        private const double CornerThickness = 5;
+        private const double CornerThickness = 2;
 
         /// <summary>
         /// The camera parameters found from the camera calibration
@@ -104,7 +109,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Constants for 1 euro filter
         /// </summary>
-        private const double euroMinCutoff = 0.001, euroBeta = 10;
+        private const double euroMinCutoff = 0.001, euroBeta = 0;
 
         /// <summary>
         /// Filters for head position
@@ -118,6 +123,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private const float expFilterConst = 0.5f;
 
+        ColourImageWindow colourWindow = new ColourImageWindow();
+
         /// <summary>
         /// Constructor for the MarkerFinder class
         /// </summary>
@@ -129,13 +136,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             //From running OCVKinectCameraCalib we get the following:
             //Intrinsic Calculation Error: 0.715600135211483
             //Results:
-            //Camera matrix: 1003.51217273555,0,639.744767107202,0,999.013101464053,479.683396908507,0,0,1,
-            //Distortion Parameters: 0.079800650654781,0,2.12199579096527E-314,0,1.26767782840851E-311,1.26763894007465E-311,0,0,0,1.26739902687602E-311,0,0,4.9868923567144E-316,0,
-            double[] cameraMatrixArray0 = { 1003.51217273555, 0, 639.744767107202 };
-            double[] cameraMatrixArray1 = { 0, 999.013101464053, 479.683396908507 };
+            //Camera matrix: 1086.56022934489,0,638.973519919036,0,1085.81336040516,479.725172086703,0,0,1,
+            //Distortion Parameters: 0.107123870820562,0,0,0,0,6.95232994533967E-310,0,6.95232994713451E-310,0,7.64923658912117E+232,0,5.28496633257694E-308,2.12199579145934E-314,8.12198220026745E-312,
+            double[] cameraMatrixArray0 = { 1086.56022934489, 0, 638.973519919036, };
+            double[] cameraMatrixArray1 = { 0, 1085.81336040516, 479.725172086703, };
             double[] cameraMatrixArray2 = { 0, 0, 1 };
             double[][] cameraMatrixArray = { cameraMatrixArray0, cameraMatrixArray1, cameraMatrixArray2 };
-            double[] distortionParametersArray = { 0.079800650654781, 0, 2.12199579096527E-314, 0, 1.26767782840851E-311, 1.26763894007465E-311, 0, 0, 0, 1.26739902687602E-311, 0, 0, 4.9868923567144E-316, 0 };
+            double[] distortionParametersArray = { 0.107123870820562, 0, 0, 0, 0, 6.95232994533967E-310, 0, 6.95232994713451E-310, 0, 7.64923658912117E+232, 0, 5.28496633257694E-308, 2.12199579145934E-314, 8.12198220026745E-312, };
             for (int i = 0; i < cameraMatrixArray.Length; i++)
             {
                 for (int j = 0; j < cameraMatrixArray[i].Length; j++)
@@ -148,8 +155,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 distortionParameters.Data[0,i] = distortionParametersArray[i];
             }
 
+            colourWindow.Show();
+
             // This code generates all the test markers. Uncomment to generate
-            //for (int i = 0; i < 50; i++)
+            //for (int i = 0; i < dictionaryCount; i++)
             //{
             //    Mat markerImage = new Mat();
             //    ArucoInvoke.DrawMarker(dictionary, i, 200, markerImage);
@@ -173,7 +182,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
             List<double[]> translationVectors, ref double deltaT, List<double> headRotMatrix, List<double> headPos, List<double> eePos)
         {
-            //if (framesProcessed++ % throttleFinding != 0) return 0;
+            // Stopwatch code: put the last 2 seconds before the good return
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew(); //creates and start the instance of Stopwatch
 
             using (VectorOfInt ids = new VectorOfInt())
             using (VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF())
@@ -183,13 +193,36 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 if (frame == null) return 0;
 
                 DetectorParameters p = DetectorParameters.GetDefault();
+                p.DoCornerRefinement = true;
+                p.AdaptiveThreshConstant = 7;
+                p.AdaptiveThreshWinSizeStep = 2;
+                p.AdaptiveThreshWinSizeMin = 90;
+                p.AdaptiveThreshWinSizeMax = 90;
                 Bitmap frameBitmap = ImageToBitmap(frame);
+                colourWindow.setImageBitmapSource(frameBitmap);
                 frameBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX); // The Kinect sems to flip the image
                 Image<Bgr, byte> imageFromKinect = new Image<Bgr, byte>(frameBitmap);
+
+                //Image<Gray, Byte> grayFrame = imageFromKinect.Convert<Gray, Byte>();
+                //Image<Gray, Byte> grayFrameThresh = new Image<Gray, Byte>(grayFrame.Size);
+                //CvInvoke.Threshold(grayFrame, grayFrameThresh, colourWindow.thresholdValue,255,Emgu.CV.CvEnum.ThresholdType.Binary);
+                //Bitmap threshBitmap = grayFrameThresh.ToBitmap();
+                //colourWindow.setImageBitmapSource(threshBitmap);
 
                 ArucoInvoke.DetectMarkers(imageFromKinect, dictionary, corners, ids, p, rejected);
 
                 if(ids.Size == 0) return 0;
+
+                bool allBadIds = true;
+                for (int i = 0; i < ids.Size; i++)
+                {
+                    if(Enum.GetName(typeof(MarkerTypes),ids[i]) != null)
+                    {
+                        allBadIds = false;
+                        break;
+                    }
+                }
+                if (allBadIds) return 0;
 
                 DateTime tempNow = DateTime.Now;
                 if(lastUpdateTime.Ticks == 0)
@@ -344,7 +377,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 }
 
                 // Draw the markers
-                using (DrawingContext dc = this.drawingGroup.Open())
+                using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
                 {
                     PointF[][] outArray = corners.ToArrayOfArray();
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
@@ -355,9 +388,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         PointF[] markerArray = outArray[i];
                         for (int j = 0; j < markerArray.Length; j++)
                         {
-                            // Redo mirroring
-                            markerArray[j].X = cImgWidth - markerArray[j].X;
-
                             // From front view, top right = blue = markerarray[0]. Rest are CCW
                             System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[j].X/2, (int)markerArray[j].Y/2);
                             dc.DrawEllipse(
@@ -366,9 +396,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                                 cornerPoint,
                                 CornerThickness,
                                 CornerThickness);
+
+                            // Redo mirroring
+                            markerArray[j].X = cImgWidth - markerArray[j].X;
                         }
                     }
                 }
+                stopwatch.Stop();
+                Console.WriteLine("Marker Latency: " + stopwatch.ElapsedMilliseconds);
                 return ids.Size;
             }
         }

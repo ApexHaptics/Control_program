@@ -86,6 +86,9 @@
     <Compile Include="Physics.cs" />
     <Compile Include="SerialComms.cs" />
     <Compile Include="SkeletonRenderer.cs" />
+    <Compile Include="ColourImageWindow.xaml.cs">
+      <DependentUpon>ColourImageWindow.xaml</DependentUpon>
+    </Compile>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -99,6 +102,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="ColourImageWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">

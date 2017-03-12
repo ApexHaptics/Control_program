@@ -78,6 +78,21 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public event KinPosUpdateHandler kinPosUpdated;
 
         /// <summary>
+        /// A delegate type for handling a robot enabled state update
+        /// </summary>
+        public delegate void EnabledStateHandler(bool isEnabled);
+
+        /// <summary>
+        /// The event fired when a the robot reports that it has been successfully enabled or disabled
+        /// </summary>
+        public event EnabledStateHandler enabledStateUpdated;
+
+        /// <summary>
+        /// Whether the robot's comms are enabled
+        /// </summary>
+        private bool robotIsEnabled = false;
+
+        /// <summary>
         /// The button which enables/disables the controller
         /// </summary>
         Button enableButton;
@@ -345,17 +360,25 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="b">Unused</param>
         void enablerHandler(byte[] b)
         {
+            string buttonString;
+            System.Windows.Media.Brush buttonColor;
+            robotIsEnabled = !robotIsEnabled;
+
+            enabledStateUpdated(robotIsEnabled);
+            if(robotIsEnabled)
+            {
+                buttonString = "Disable Controller";
+                buttonColor = System.Windows.Media.Brushes.DarkRed;
+            }
+            else
+            {
+                buttonString = "Enable Controller";
+                buttonColor = System.Windows.Media.Brushes.DarkGreen;
+            }
+
             Action a = delegate {
-                if ((string)enableButton.Content == "Enable Controller")
-                {
-                    enableButton.Content = "Disable Controller";
-                    enableButton.Background = System.Windows.Media.Brushes.DarkRed;
-                }
-                else
-                {
-                    enableButton.Content = "Enable Controller";
-                    enableButton.Background = System.Windows.Media.Brushes.DarkGreen;
-                }
+                enableButton.Content = buttonString;
+                enableButton.Background = buttonColor;
                 enableButton.IsEnabled = true;
             };
             enableButton.Dispatcher.Invoke(a);
@@ -467,9 +490,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     Console.WriteLine("Serial read timeout");
                 }
-                catch
+                catch(Exception e)
                 {
-                    Console.WriteLine("Serial read error");
+                    Console.WriteLine("Serial read error: " + e.Message);
                 }
             }
         }

@@ -13,7 +13,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The radius of our workspace
         /// </summary>
-        private const float work_radius = 0.33f;
+        private const float work_radius = 0.25f;
 
         /// <summary>
         /// The lower z of our workspace
@@ -130,10 +130,38 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             this.comms = comms;
             comms.kinPosUpdated += Comms_kinPosUpdated;
+            comms.enabledStateUpdated += Comms_enabledStateUpdated;
             this.btService = btService;
-            gameThread = new Thread(this.GameLoop);
+            this.gameThread = new Thread(this.GameLoop);
             this.gameButton = gameButton;
             gameButton.Click += GameButton_Click;
+        }
+        
+        /// <summary>
+        /// If looping stops the current game loop and prepares for another if the robot is disabled
+        /// </summary>
+        /// <param name="isEnabled"></param>
+        private void Comms_enabledStateUpdated(bool isEnabled)
+        {
+            System.Windows.Media.Brush buttonColor;
+            
+            if (isEnabled)
+            {
+                buttonColor = System.Windows.Media.Brushes.DarkGreen;
+            }
+            else
+            {
+                Stop();
+                this.gameThread = new Thread(this.GameLoop);
+                buttonColor = System.Windows.Media.Brushes.DarkGray;
+            }
+
+            Action a = delegate {
+                gameButton.Content = "Start Game";
+                gameButton.Background = buttonColor;
+                gameButton.IsEnabled = isEnabled;
+            };
+            gameButton.Dispatcher.Invoke(a);
         }
 
         /// <summary>
@@ -141,6 +169,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         private void GameButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
+            _continue = true;
             if (!gameThread.IsAlive)
             {
                 this.gameThread.Start();
@@ -277,10 +306,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void Stop()
         {
             _continue = false;
-            positionQueue.Add(null);
             if (gameThread != null && gameThread.IsAlive)
             {
+                positionQueue.Add(null);
                 gameThread.Join();
+                positionQueue = new BlockingCollection<double[]>(new ConcurrentQueue<double[]>());
             }
         }
 
