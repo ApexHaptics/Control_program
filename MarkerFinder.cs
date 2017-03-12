@@ -91,6 +91,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private const float MarkerWidth = 0.07f;
 
         /// <summary>
+        /// The angle which the marker must be tilted less than
+        /// </summary>
+        private const double ThresholdMarkerAngle = Math.PI / 4;
+
+        /// <summary>
         /// What the marker IDs actually correspond to
         /// </summary>
         private enum MarkerTypes
@@ -100,11 +105,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             HeadRight = 2,
             EndEffector = 3,
         }
-
-        /// <summary>
-        /// The previous head rotation matrix
-        /// </summary>
-        private List<double> prevHeadRotMatrix = null;
 
         /// <summary>
         /// Constants for 1 euro filter
@@ -117,11 +117,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private OneEuroFilter[] headFilters = { new OneEuroFilter(euroMinCutoff, euroBeta),
             new OneEuroFilter(euroMinCutoff, euroBeta),
             new OneEuroFilter(euroMinCutoff, euroBeta) };
-
-        /// <summary>
-        /// The constant at which our exponential filter decreases
-        /// </summary>
-        private const float expFilterConst = 0.5f;
 
         ColourImageWindow colourWindow = new ColourImageWindow();
 
@@ -183,7 +178,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double[]> translationVectors, ref double deltaT, List<double> headRotMatrix, List<double> headPos, List<double> eePos)
         {
             // Stopwatch code: put the last 2 seconds before the good return
-            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew(); //creates and start the instance of Stopwatch
+            //System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew(); //creates and start the instance of Stopwatch
+            //stopwatch.Stop();
+            //Console.WriteLine("Marker Latency: " + stopwatch.ElapsedMilliseconds);
 
             using (VectorOfInt ids = new VectorOfInt())
             using (VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF())
@@ -199,7 +196,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 p.AdaptiveThreshWinSizeMin = 90;
                 p.AdaptiveThreshWinSizeMax = 90;
                 Bitmap frameBitmap = ImageToBitmap(frame);
-                colourWindow.setImageBitmapSource(frameBitmap);
+                //colourWindow.setImageBitmapSource(frameBitmap);
                 frameBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX); // The Kinect sems to flip the image
                 Image<Bgr, byte> imageFromKinect = new Image<Bgr, byte>(frameBitmap);
 
@@ -210,8 +207,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 //colourWindow.setImageBitmapSource(threshBitmap);
 
                 ArucoInvoke.DetectMarkers(imageFromKinect, dictionary, corners, ids, p, rejected);
+                PointF[][] cornersArray = corners.ToArrayOfArray();
 
-                if(ids.Size == 0) return 0;
+                if (ids.Size == 0) return 0;
 
                 bool allBadIds = true;
                 for (int i = 0; i < ids.Size; i++)
@@ -245,10 +243,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 using (Mat rvecs = new Mat())
                 using (Mat tvecs = new Mat())
                 {
-                    List<double[]> outputRotMatrices = new List<double[]>();
-                    List<double> headX = new List<double>();
-                    List<double> headY = new List<double>();
-                    List<double> headZ = new List<double>();
                     try
                     {
                         ArucoInvoke.EstimatePoseSingleMarkers(corners, MarkerWidth, cameraMatrix, distortionParameters, rvecs, tvecs);
@@ -330,62 +324,43 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             }
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
+
+                            double angleOff = Math.Acos(trans_z.Data[0,2]/VecMagnitude(trans_z));
+                            if (angleOff < ThresholdMarkerAngle) break;
+                            
+                            List<double> unfilteredHeadPos = new List<double>();
+                            unfilteredHeadPos.Add(position.Data[0, 0]);
+                            unfilteredHeadPos.Add(position.Data[1, 0]);
+                            unfilteredHeadPos.Add(position.Data[2, 0]);
+
+                            double rate = 1000 / deltaT;
+                            foreach (double pos in unfilteredHeadPos.Zip(headFilters, (x, y) => y.Filter(x, rate)))
+                            {
+                                headPos.Add(pos);
+                            }
                             // Manual rotation matrix
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
                             Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z - Math.Sin(offset_angle) * trans_x;
-
+                            
                             double[] outputRotMatrix = new double[] {
                                 new_x_axis.Data[0, 0], transMatrix.Data[1, 0], new_z_axis.Data[0, 0],
                                 new_x_axis.Data[1, 0], transMatrix.Data[1, 1], new_z_axis.Data[1, 0],
                                 new_x_axis.Data[2, 0], transMatrix.Data[1, 2], new_z_axis.Data[2, 0],
                             };
-                            outputRotMatrices.Add(outputRotMatrix);
-
-                            // Add head marker data to lists - nothing else should have made it here
-                            headX.Add(position.Data[0, 0]);
-                            headY.Add(position.Data[1, 0]);
-                            headZ.Add(position.Data[2, 0]);
+                            headRotMatrix.AddRange(outputRotMatrix);
                         }
-                    }
-                    if (outputRotMatrices.Count != 0)
-                    {
-                        for (int i = 0; i < 9; i++)
-                        {
-                            double total = 0;
-                            foreach (double[] outputTransMatrix in outputRotMatrices)
-                            {
-                                total += outputTransMatrix[i];
-                            }
-                            headRotMatrix.Add(total / outputRotMatrices.Count);
-                        }
-                        List<double> unfilteredHeadPos = new List<double>();
-                        unfilteredHeadPos.Add(headX.Average());
-                        unfilteredHeadPos.Add(headY.Average());
-                        unfilteredHeadPos.Add(headZ.Average());
-
-                        double rate = 1000 / deltaT;
-                        foreach(double pos in unfilteredHeadPos.Zip(headFilters, (x, y) => y.Filter(x, rate)))
-                        {
-                            headPos.Add(pos);
-                        }
-                        if (prevHeadRotMatrix != null)
-                        {
-                            headRotMatrix = headRotMatrix.Zip(prevHeadRotMatrix, (x, y) => x * expFilterConst + y * (1 - expFilterConst)).ToList();
-                        }
-                        prevHeadRotMatrix = headRotMatrix;
                     }
                 }
 
                 // Draw the markers
                 using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
                 {
-                    PointF[][] outArray = corners.ToArrayOfArray();
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
-                    for (int i = 0; i < outArray.Length; i++)
+                    for (int i = 0; i < cornersArray.Length; i++)
                     {
                         if (!Enum.IsDefined(typeof(MarkerTypes), ids[i])) continue;
 
-                        PointF[] markerArray = outArray[i];
+                        PointF[] markerArray = cornersArray[i];
                         for (int j = 0; j < markerArray.Length; j++)
                         {
                             // From front view, top right = blue = markerarray[0]. Rest are CCW
@@ -402,8 +377,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         }
                     }
                 }
-                stopwatch.Stop();
-                Console.WriteLine("Marker Latency: " + stopwatch.ElapsedMilliseconds);
                 return ids.Size;
             }
         }
@@ -427,6 +400,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             Marshal.Copy(pixeldata, 0, ptr, Image.PixelDataLength);
             bmap.UnlockBits(bmapdata);
             return bmap;
+        }
+
+        /// <summary>
+        /// Finds the magnitude of a 3D vector
+        /// </summary>
+        /// <param name="mat">Input matrix (3d vertical)</param>
+        /// <returns>The matrix's magnitude</returns>
+        double VecMagnitude(Matrix<double> mat)
+        {
+            double squaredSum = Math.Pow(mat.Data[0, 0], 2) + Math.Pow(mat.Data[0, 1], 2) + Math.Pow(mat.Data[0, 2], 2);
+            return Math.Sqrt(squaredSum);
         }
     }
 }
