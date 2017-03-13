@@ -51,6 +51,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void setImageBitmapSource(Bitmap bitmap)
         {
             Dispatcher.BeginInvoke(new Action(() => {
+                if (!(bool)DisplayCheckBox.IsChecked) return;
                 Image.Source = BitmapToImageSource(bitmap);
             }));
         }

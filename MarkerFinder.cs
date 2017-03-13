@@ -88,7 +88,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The length of a marker edge (in m) used for scaling translation vectors
         /// </summary>
-        private const float MarkerWidth = 0.07f;
+        private const float MarkerWidth = 0.10f;
 
         /// <summary>
         /// The angle which the marker must be tilted less than
@@ -293,19 +293,19 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             switch ((MarkerTypes)ids[i])
                             {
                                 case MarkerTypes.HeadLeft:
-                                    offset[0, 0] = 0;
+                                    offset[0, 0] = -0.072;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.07;
+                                    offset[2, 0] = -0.106;
                                     break;
                                 case MarkerTypes.HeadCenter:
                                     offset[0, 0] = 0;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.045;
+                                    offset[2, 0] = -0.023;
                                     break;
                                 case MarkerTypes.HeadRight:
-                                    offset[0, 0] = 0;
+                                    offset[0, 0] = 0.072;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.07;
+                                    offset[2, 0] = -0.106;
                                     break;
                                 case MarkerTypes.EndEffector:
                                     // TODO: Find end effector offset

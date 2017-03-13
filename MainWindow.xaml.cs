@@ -68,14 +68,19 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private const double euroMinCutoff = 1, euroBeta = 100;
 
         /// <summary>
-        /// One euro filters
+        /// One euro filters for joints
         /// </summary>
-        private OneEuroFilter filterLeftX = new OneEuroFilter(euroMinCutoff, euroBeta),
-            filterLeftY = new OneEuroFilter(euroMinCutoff, euroBeta),
-            filterLeftZ = new OneEuroFilter(euroMinCutoff, euroBeta),
-            filterRightX = new OneEuroFilter(euroMinCutoff, euroBeta),
-            filterRightY = new OneEuroFilter(euroMinCutoff, euroBeta),
-            filterRightZ = new OneEuroFilter(euroMinCutoff, euroBeta);
+        private OneEuroFilter[] jointFilters = { new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta),
+            new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta), new OneEuroFilter(euroMinCutoff, euroBeta) };
+
+        /// <summary>
+        /// Which joints we will send over bluetooth. All others ignored
+        /// </summary>
+        private static readonly JointType[] JointsToSend = { JointType.Head, JointType.HandLeft,
+            JointType.HandRight, JointType.WristLeft, JointType.WristRight };
 
         /// <summary>
         /// DrawingGroup used to draw euro filter results
@@ -86,12 +91,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Brush used to draw euro filtered points
         /// </summary>
         private readonly System.Windows.Media.Brush euroOutput = System.Windows.Media.Brushes.Magenta;
-
-        /// <summary>
-        /// Which joints we will send over bluetooth. All other ignored
-        /// </summary>
-        private static readonly JointType[] JointsToSend = { JointType.Head, JointType.HandLeft,
-            JointType.HandRight, JointType.WristLeft, JointType.WristRight };
 
         /// <summary>
         /// The last calibrated robot position
@@ -289,61 +288,34 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 lastSkeletonSent = tempNow;
                 double rate = 1000 / (double)deltaT;
 
-                //foreach (Joint joint in skeletonToSend.Joints)
-                //{
-                //    stringToSend = stringToSend + "JNT," +
-                //        (int)joint.JointType + "," +
-                //        (int)joint.TrackingState + ",";
-                //    stringToSend = stringToSend + joint.Position.X + "," +
-                //        joint.Position.Y + "," +
-                //        joint.Position.Z + ",";
-                //}
-
                 using (DrawingContext dc = this.euroDrawingGroup.Open())
                 {
                     dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, 640.0f, 480.0f));
-                    // Order: SC, HD, WL, HL, WR, HR
                     foreach (Joint joint in skeletonToSend.Joints)
                     {
-                        if (!JointsToSend.Contains(joint.JointType)) continue;
+                        double jointX = -joint.Position.X + 0.025;
+                        double jointY = -joint.Position.Y;
+                        double jointZ = joint.Position.Z;
+
+                        int filtersIndex = Array.IndexOf(JointsToSend, joint.JointType) * 3;
+                        if (filtersIndex < 0) continue;
 
                         stringToSend = stringToSend + "JNT," +
                             (int)joint.JointType + "," +
                             (int)joint.TrackingState + ",";
-                        if (joint.JointType == JointType.HandRight && deltaT > 0)
-                        {
-                            SkeletonPoint euroRightHand = new SkeletonPoint();
-                            euroRightHand.X = (float)filterRightX.Filter(joint.Position.X, rate);
-                            euroRightHand.Y = (float)filterRightY.Filter(joint.Position.Y, rate);
-                            euroRightHand.Z = (float)filterRightZ.Filter(joint.Position.Z, rate);
-                            stringToSend = stringToSend + euroRightHand.X + "," + euroRightHand.Y + "," + euroRightHand.Z + ",";
-                            DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroRightHand, DepthImageFormat.Resolution640x480Fps30);
-                            System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
-                            dc.DrawEllipse(this.euroOutput,
-                                null,
-                                cornerPoint,
-                                3, 3);
-                        }
-                        else if (joint.JointType == JointType.HandLeft && deltaT > 0)
-                        {
-                            SkeletonPoint euroLeftHand = new SkeletonPoint();
-                            euroLeftHand.X = (float)filterLeftX.Filter(joint.Position.X, rate);
-                            euroLeftHand.Y = (float)filterLeftY.Filter(joint.Position.Y, rate);
-                            euroLeftHand.Z = (float)filterLeftZ.Filter(joint.Position.Z, rate);
-                            stringToSend = stringToSend + euroLeftHand.X + "," + euroLeftHand.Y + "," + euroLeftHand.Z + ",";
-                            DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroLeftHand, DepthImageFormat.Resolution640x480Fps30);
-                            System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
-                            dc.DrawEllipse(this.euroOutput,
-                                null,
-                                cornerPoint,
-                                3, 3);
-                        }
-                        else
-                        {
-                            stringToSend = stringToSend + joint.Position.X + "," +
-                                joint.Position.Y + "," +
-                                joint.Position.Z + ",";
-                        }
+                        SkeletonPoint euroJoint = new SkeletonPoint(); 
+                        euroJoint.X = (float)jointFilters[filtersIndex].Filter(jointX, rate);
+                        euroJoint.Y = (float)jointFilters[filtersIndex+1].Filter(jointY, rate);
+                        euroJoint.Z = (float)jointFilters[filtersIndex+2].Filter(jointZ, rate);
+                        stringToSend = stringToSend + euroJoint.X + "," + euroJoint.Y + "," + euroJoint.Z + ",";
+                        euroJoint.X = -euroJoint.X + 0.025f;
+                        euroJoint.X = -euroJoint.Y;
+                        DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroJoint, DepthImageFormat.Resolution640x480Fps30);
+                        System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
+                        dc.DrawEllipse(this.euroOutput,
+                            null,
+                            cornerPoint,
+                            3, 3);
                     }
                 }
                 bluetoothService.Send(stringToSend);
@@ -361,6 +333,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (calibRobPos == null) return;
 
             string stringToSend = "RPos,";
+
+            if (!gameLogic.isInteractable)
+            {
+                if (lastPosSent.Ticks > 0) return;
+
+                // Send sentinel value because the end effector is no longer interactable
+                lastPosSent = new DateTime(0);
+                stringToSend = stringToSend + "0,0,0,0,";
+                bluetoothService.Send(stringToSend);
+            }
 
             DateTime tempNow = DateTime.Now;
             stringToSend = stringToSend + (int)tempNow.Subtract(lastPosSent).TotalMilliseconds + ",";

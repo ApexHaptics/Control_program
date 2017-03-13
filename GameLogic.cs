@@ -101,16 +101,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         };
 
         /// <summary>
-        /// Possible stages of game logic
-        /// </summary>
-        enum GameState
-        {
-            MovingToXY,
-            ImpedanceSet,
-            PositionReached,
-        }
-
-        /// <summary>
         /// The current impendence selected
         /// </summary>
         int currentImpendenceIndex = 0;
@@ -118,7 +108,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// Whether threads should continue
         /// </summary>
-        bool _continue = true;
+        private bool _continue = true;
+
+        /// <summary>
+        /// Whether the end effector should be interacted with
+        /// </summary>
+        public bool isInteractable = false;
 
         /// <summary>
         /// Constructor for the GameLogic class
@@ -209,7 +204,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             {
                 // Set impedance to special uninteractable value while moving
                 comms.SetImpedance(0, 0, 0);
-                InformDisplayOfGameState(GameState.MovingToXY);
 
                 // Step 1: Go down to low z
                 z = work_z_low;
@@ -227,14 +221,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 comms.SetImpedance(impedanceValues[currentImpendenceIndex][0],
                     impedanceValues[currentImpendenceIndex][1],
                     impedanceValues[currentImpendenceIndex][2]);
-                InformDisplayOfGameState(GameState.ImpedanceSet, currentImpendenceIndex);
+                InformDisplayOfGameState(currentImpendenceIndex);
                 currentImpendenceIndex = (currentImpendenceIndex + 1) % impedanceValues.Length;
+                this.isInteractable = true;
 
                 // Step 4: Interaction z, previous x,y
                 z = work_z_mid;
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
-                InformDisplayOfGameState(GameState.PositionReached);
 
                 // Step 5: Wait 10s or for button pressed
                 Action a = delegate {
@@ -257,17 +251,17 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     gameButton.Background = System.Windows.Media.Brushes.DarkGray;
                 };
                 gameButton.Dispatcher.Invoke(a);
+                this.isInteractable = false;
             }
         }
 
         /// <summary>
         /// Informs the display of the current stage in game logic
         /// </summary>
-        /// <param name="state">The current game state enum</param>
         /// <param name="data">An integer which contains game state data</param>
-        private void InformDisplayOfGameState(GameState state, int data = 0)
+        private void InformDisplayOfGameState(int data = 0)
         {
-            string stringToSend = "GStt," + (int)state + "," + data;
+            string stringToSend = "GStt," + data;
             btService.Send(stringToSend);
         }
 
