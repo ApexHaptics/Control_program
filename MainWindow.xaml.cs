@@ -13,9 +13,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
     using System.Linq;
     using System;
     using System.Drawing;
-    using System.Collections.Generic;    /// <summary>
-                                         /// Interaction logic for MainWindow.xaml
-                                         /// </summary>
+    using System.Collections.Generic;
+    using Emgu.CV;
+    
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
         /// <summary>
@@ -83,6 +86,22 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Brush used to draw euro filtered points
         /// </summary>
         private readonly System.Windows.Media.Brush euroOutput = System.Windows.Media.Brushes.Magenta;
+
+        /// <summary>
+        /// Which joints we will send over bluetooth. All other ignored
+        /// </summary>
+        private static readonly JointType[] JointsToSend = { JointType.Head, JointType.HandLeft,
+            JointType.HandRight, JointType.WristLeft, JointType.WristRight };
+
+        /// <summary>
+        /// The last calibrated robot position
+        /// </summary>
+        Matrix<double> calibRobPos = null;
+
+        /// <summary>
+        /// The last calibrated robot rotation matrix
+        /// </summary>
+        Matrix<double> calibRobRotMatrix = null;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -202,22 +221,29 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double[]> rotationList = new List<double[]>();
             List<double[]> translationList = new List<double[]>();
             List<double> headPos = new List<double>();
-            List<double> eePos = new List<double>();
-            List<double> transMatrix = new List<double>();
+            List<double> headRotMatrix = new List<double>();
+            List<double> robPos = new List<double>();
+            List<double> robRotMatrix = new List<double>();
             double deltaT = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, transMatrix, headPos, eePos);
+            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, headPos, headRotMatrix, robPos, robRotMatrix);
 
-            if (markerCount == 0 || (headPos.Count == 0 && eePos.Count == 0)) return;
+            if (markerCount == 0 || (headPos.Count == 0 && robPos.Count == 0)) return;
 
             string stringToSend = "MLoc," + (int)deltaT + ",";
 
             if (headPos.Count != 0)
             {
-                stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", transMatrix) + ",";
+                stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", headRotMatrix) + ",";
             }
-            if (eePos.Count != 0)
+            if (robPos.Count != 0)
             {
-                stringToSend = stringToSend + "EEF," + String.Join(",", eePos) + ",";
+                stringToSend = stringToSend + "ROB," + String.Join(",", robPos) + "," + String.Join(",", robRotMatrix) + ",";
+                calibRobPos = new Matrix<double>(robPos.ToArray());
+                calibRobRotMatrix = new Matrix<double>(3,3);
+                for(int i = 0; i < 9; i++)
+                {
+                    calibRobRotMatrix.Data[i / 3, i % 3] = robRotMatrix[i];
+                }
             }
 
             bluetoothService.Send(stringToSend);
@@ -279,6 +305,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     // Order: SC, HD, WL, HL, WR, HR
                     foreach (Joint joint in skeletonToSend.Joints)
                     {
+                        if (!JointsToSend.Contains(joint.JointType)) continue;
+
                         stringToSend = stringToSend + "JNT," +
                             (int)joint.JointType + "," +
                             (int)joint.TrackingState + ",";
@@ -330,14 +358,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="position">The position of the robot</param>
         private void kinPositionUpdated(double[] position)
         {
+            if (calibRobPos == null) return;
+
             string stringToSend = "RPos,";
 
             DateTime tempNow = DateTime.Now;
             stringToSend = stringToSend + (int)tempNow.Subtract(lastPosSent).TotalMilliseconds + ",";
             lastPosSent = tempNow;
 
-            // TODO: This is in robot frame and should be adjusted to Kinect frame.
-            stringToSend = stringToSend + position[0] + position[1] + position[2];
+            Matrix<double> positionMat = new Matrix<double>(position);
+            positionMat = calibRobPos + calibRobRotMatrix * positionMat;
+            
+            stringToSend = stringToSend + positionMat.Data[0, 0] + positionMat.Data[1, 0] + positionMat.Data[2, 0];
             bluetoothService.Send(stringToSend);
         }
 

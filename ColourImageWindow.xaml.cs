@@ -32,6 +32,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public int thresholdValue = 127;
 
         /// <summary>
+        /// Whether we should be calibrating the marker
+        /// </summary>
+        public bool shouldCalibrate = false;
+
+        /// <summary>
         /// Standard constructor
         /// </summary>
         public ColourImageWindow()
@@ -90,6 +95,21 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 if (string.IsNullOrEmpty(ThresholdBox.Text)) return;
                 thresholdValue = int.Parse(ThresholdBox.Text);
                 ThresholdBox.Text = "";
+            }
+        }
+
+        private void CalibButton_Click(object sender, RoutedEventArgs e)
+        {
+            shouldCalibrate = !shouldCalibrate;
+            if(shouldCalibrate)
+            {
+                CalibButton.Content = "Stop Calib";
+                CalibButton.Background = System.Windows.Media.Brushes.DarkRed;
+            }
+            else
+            {
+                CalibButton.Content = "Begin Calib";
+                CalibButton.Background = System.Windows.Media.Brushes.DarkGreen;
             }
         }
     }

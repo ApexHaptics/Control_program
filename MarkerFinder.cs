@@ -118,6 +118,19 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             new OneEuroFilter(euroMinCutoff, euroBeta),
             new OneEuroFilter(euroMinCutoff, euroBeta) };
 
+        /// <summary>
+        /// How much we are lowpassing the calibration by
+        /// </summary>
+        private double calibAlpha = 0.1;
+
+        /// <summary>
+        /// Lowpass filters for all calibration parameters (translation vector XYZ, rotation vector XYZ)
+        /// </summary>
+        private List<LowpassFilter> robotCalibrationFilters = new List<LowpassFilter>();
+
+        /// <summary>
+        /// The window for displaying the markers and colour image
+        /// </summary>
         ColourImageWindow colourWindow = new ColourImageWindow();
 
         /// <summary>
@@ -170,12 +183,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="rotationVectors">a list to be populated with found rotation vectors</param>
         /// <param name="translationVectors">a list to be populated with found translation vectors</param>
         /// <param name="deltaT">will be populated with the delta time since the last update (in ms)</param>
-        /// <param name="headRotMatrix">The estimated rotation matrix of the head [x,y,z] axis vectors</param>
         /// <param name="headPos">will be populated with the averaged position vector of the head (x,y,z)</param>
-        /// <param name="eePos">will be populated with the position vector of the end effector (x,y,z)</param>
+        /// <param name="headRotMatrix">The estimated rotation matrix of the head [x,y,z] axis vectors</param>
+        /// <param name="robotPos">will be populated with the position vector of the robot (x,y,z)</param>
+        /// <param name="robotRotMatrix">The estimated rotation matrix of the robot [x,y,z] axis vectors</param>
         /// <returns>The number of markers found</returns>
         public int FindMarkers(ColorImageFrameReadyEventArgs e, List<int> idList, List<double[]> rotationVectors,
-            List<double[]> translationVectors, ref double deltaT, List<double> headRotMatrix, List<double> headPos, List<double> eePos)
+            List<double[]> translationVectors, ref double deltaT, List<double> headPos, List<double> headRotMatrix,
+            List<double> robotPos, List<double> robotRotMatrix)
         {
             // Stopwatch code: put the last 2 seconds before the good return
             //System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew(); //creates and start the instance of Stopwatch
@@ -196,10 +211,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 p.AdaptiveThreshWinSizeMin = 90;
                 p.AdaptiveThreshWinSizeMax = 90;
                 Bitmap frameBitmap = ImageToBitmap(frame);
-                //colourWindow.setImageBitmapSource(frameBitmap);
+                colourWindow.setImageBitmapSource(frameBitmap);
                 frameBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX); // The Kinect sems to flip the image
                 Image<Bgr, byte> imageFromKinect = new Image<Bgr, byte>(frameBitmap);
 
+                // Manual thresholding code
                 //Image<Gray, Byte> grayFrame = imageFromKinect.Convert<Gray, Byte>();
                 //Image<Gray, Byte> grayFrameThresh = new Image<Gray, Byte>(grayFrame.Size);
                 //CvInvoke.Threshold(grayFrame, grayFrameThresh, colourWindow.thresholdValue,255,Emgu.CV.CvEnum.ThresholdType.Binary);
@@ -209,7 +225,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 ArucoInvoke.DetectMarkers(imageFromKinect, dictionary, corners, ids, p, rejected);
                 PointF[][] cornersArray = corners.ToArrayOfArray();
 
-                if (ids.Size == 0) return 0;
+                if (ids.Size == 0)
+                {
+                    // Clear the screen
+                    using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
+                    {
+                        dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
+                    }
+                    return 0;
+                }
 
                 bool allBadIds = true;
                 for (int i = 0; i < ids.Size; i++)
@@ -257,12 +281,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         using (Mat tvecMat = tvecs.Row(i))
                         using (Mat transMat = new Mat())
                         {
-                            double[] values = new double[3];
-                            rvecMat.CopyTo(values);
-                            rotationVectors.Add(values);
-                            values = new double[3];
-                            tvecMat.CopyTo(values);
-                            translationVectors.Add(values);
+                            double[] rvecValues = new double[3];
+                            rvecMat.CopyTo(rvecValues);
+                            rotationVectors.Add(rvecValues);
+                            double[] tvecValues = new double[3];
+                            tvecMat.CopyTo(tvecValues);
+                            translationVectors.Add(tvecValues);
 
                             // Calculate position with offset
                             Matrix<double> offset = new Matrix<double>(3, 1);
@@ -299,11 +323,47 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             Matrix<double> position = new Matrix<double>(translationVectors[i]);
                             position = position + transMatrix * offset;
 
+                            // End effector calibration logic
                             if ((MarkerTypes)ids[i] == MarkerTypes.EndEffector)
                             {
-                                eePos.Add(position.Data[0, 0]);
-                                eePos.Add(position.Data[1, 0]);
-                                eePos.Add(position.Data[2, 0]);
+                                bool isCalibrating = robotCalibrationFilters.Count > 0;
+                                if(colourWindow.shouldCalibrate)
+                                {
+                                    if(!isCalibrating)
+                                    {
+                                        for(int j = 0; j < 6; j++)
+                                        {
+                                            robotCalibrationFilters.Add(new LowpassFilter());
+                                        }
+                                        robotCalibrationFilters[0].Filter(position.Data[0, 0], calibAlpha);
+                                        robotCalibrationFilters[1].Filter(position.Data[1, 0], calibAlpha);
+                                        robotCalibrationFilters[2].Filter(position.Data[2, 0], calibAlpha);
+                                        robotCalibrationFilters[3].Filter(rvecValues[0], calibAlpha);
+                                        robotCalibrationFilters[4].Filter(rvecValues[1], calibAlpha);
+                                        robotCalibrationFilters[5].Filter(rvecValues[2], calibAlpha);
+                                    }
+                                }
+                                else if (isCalibrating && !colourWindow.shouldCalibrate) {
+                                    // Calibration completed
+                                    robotPos.Add(robotCalibrationFilters[0].Filter(position.Data[0, 0], calibAlpha));
+                                    robotPos.Add(robotCalibrationFilters[1].Filter(position.Data[1, 0], calibAlpha));
+                                    robotPos.Add(robotCalibrationFilters[2].Filter(position.Data[2, 0], calibAlpha));
+
+                                    Matrix<double> rvecForCalibration = new Matrix<double>(3,1);
+                                    rvecForCalibration.Data[0, 0] = robotCalibrationFilters[3].Filter(rvecValues[0], calibAlpha);
+                                    rvecForCalibration.Data[1, 0] = robotCalibrationFilters[4].Filter(rvecValues[1], calibAlpha);
+                                    rvecForCalibration.Data[2, 0] = robotCalibrationFilters[5].Filter(rvecValues[2], calibAlpha);
+
+                                    CvInvoke.Rodrigues(rvecForCalibration, transMat);
+                                    double[] robotRotMatrixArray = new double[] {
+                                        transMatrix.Data[0, 0], transMatrix.Data[0, 1], transMatrix.Data[0, 2],
+                                        transMatrix.Data[1, 0], transMatrix.Data[1, 1], transMatrix.Data[1, 2],
+                                        transMatrix.Data[2, 0], transMatrix.Data[2, 1], transMatrix.Data[2, 2],
+                                    };
+                                    robotRotMatrix.AddRange(robotRotMatrixArray);
+                                    robotCalibrationFilters = new List<LowpassFilter>(); // Zero it again
+                                    continue;
+                                }
                             }
 
                             // Calculate view angle - Only for head markers
@@ -325,9 +385,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
 
-                            double angleOff = Math.Acos(trans_z.Data[0,2]/VecMagnitude(trans_z));
+                            double angleOff = Math.Acos(trans_z.Data[0, 2] / VecMagnitude(trans_z));
                             if (angleOff < ThresholdMarkerAngle) break;
-                            
+
                             List<double> unfilteredHeadPos = new List<double>();
                             unfilteredHeadPos.Add(position.Data[0, 0]);
                             unfilteredHeadPos.Add(position.Data[1, 0]);
@@ -341,11 +401,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             // Manual rotation matrix
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
                             Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z - Math.Sin(offset_angle) * trans_x;
-                            
+
                             double[] outputRotMatrix = new double[] {
-                                new_x_axis.Data[0, 0], transMatrix.Data[1, 0], new_z_axis.Data[0, 0],
+                                new_x_axis.Data[0, 0], transMatrix.Data[0, 1], new_z_axis.Data[0, 0],
                                 new_x_axis.Data[1, 0], transMatrix.Data[1, 1], new_z_axis.Data[1, 0],
-                                new_x_axis.Data[2, 0], transMatrix.Data[1, 2], new_z_axis.Data[2, 0],
+                                new_x_axis.Data[2, 0], transMatrix.Data[2, 1], new_z_axis.Data[2, 0],
                             };
                             headRotMatrix.AddRange(outputRotMatrix);
                         }
@@ -355,7 +415,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 // Draw the markers
                 using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
                 {
-                    dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new System.Windows.Rect(0.0, 0.0, RenderWidth, RenderHeight));
+                    dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
                     for (int i = 0; i < cornersArray.Length; i++)
                     {
                         if (!Enum.IsDefined(typeof(MarkerTypes), ids[i])) continue;
