@@ -107,18 +107,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         }
 
         /// <summary>
-        /// Constants for 1 euro filter
-        /// </summary>
-        private const double euroMinCutoff = 0.001, euroBeta = 0;
-
-        /// <summary>
-        /// Filters for head position
-        /// </summary>
-        private OneEuroFilter[] headFilters = { new OneEuroFilter(euroMinCutoff, euroBeta),
-            new OneEuroFilter(euroMinCutoff, euroBeta),
-            new OneEuroFilter(euroMinCutoff, euroBeta) };
-
-        /// <summary>
         /// How much we are lowpassing the calibration by
         /// </summary>
         private double calibAlpha = 0.1;
@@ -387,17 +375,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                             double angleOff = Math.Acos(trans_z.Data[0, 2] / VecMagnitude(trans_z));
                             if (angleOff < ThresholdMarkerAngle) break;
+                            
+                            headPos.Add(position.Data[0, 0]);
+                            headPos.Add(position.Data[1, 0]);
+                            headPos.Add(position.Data[2, 0]);
 
-                            List<double> unfilteredHeadPos = new List<double>();
-                            unfilteredHeadPos.Add(position.Data[0, 0]);
-                            unfilteredHeadPos.Add(position.Data[1, 0]);
-                            unfilteredHeadPos.Add(position.Data[2, 0]);
-
-                            double rate = 1000 / deltaT;
-                            foreach (double pos in unfilteredHeadPos.Zip(headFilters, (x, y) => y.Filter(x, rate)))
-                            {
-                                headPos.Add(pos);
-                            }
                             // Manual rotation matrix
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;
                             Matrix<double> new_z_axis = Math.Cos(offset_angle) * trans_z - Math.Sin(offset_angle) * trans_x;

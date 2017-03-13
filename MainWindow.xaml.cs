@@ -287,6 +287,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 stringToSend = stringToSend + deltaT + ",";
                 lastSkeletonSent = tempNow;
                 double rate = 1000 / (double)deltaT;
+                if (deltaT == 0)
+                {
+                    rate = double.MaxValue;
+                }
 
                 using (DrawingContext dc = this.euroDrawingGroup.Open())
                 {
@@ -309,7 +313,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         euroJoint.Z = (float)jointFilters[filtersIndex+2].Filter(jointZ, rate);
                         stringToSend = stringToSend + euroJoint.X + "," + euroJoint.Y + "," + euroJoint.Z + ",";
                         euroJoint.X = -euroJoint.X + 0.025f;
-                        euroJoint.X = -euroJoint.Y;
+                        euroJoint.Y = -euroJoint.Y;
                         DepthImagePoint depthPoint = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(euroJoint, DepthImageFormat.Resolution640x480Fps30);
                         System.Windows.Point cornerPoint = new System.Windows.Point(depthPoint.X, depthPoint.Y);
                         dc.DrawEllipse(this.euroOutput,
@@ -317,6 +321,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             cornerPoint,
                             3, 3);
                     }
+                }
+                if (stringToSend.Contains("NaN"))
+                {
+                    return;
                 }
                 bluetoothService.Send(stringToSend);
             }
