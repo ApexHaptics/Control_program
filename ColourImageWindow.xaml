@@ -14,7 +14,7 @@
             <Image Name="MarkerImage" Width="640" Height="480"/>
         </Viewbox>
         <Button Height="25" HorizontalAlignment="Left" VerticalAlignment="Bottom" Background="DarkGreen" Foreground="White" x:Name="CalibButton" IsEnabled="True" Content="Begin Calib" Width="80" Margin="10,0,0,10" Click="CalibButton_Click"/>
-        <CheckBox Height="auto" HorizontalAlignment="Center" VerticalAlignment="Bottom" Name="DisplayCheckBox" Content="Display image" Width="auto" Margin="0,0,0,10" IsChecked="False"/>
+        <CheckBox Height="auto" HorizontalAlignment="Center" VerticalAlignment="Bottom" Name="DisplayCheckBox" Content="Display image" Width="auto" Margin="0,0,0,10" IsChecked="False" Unchecked="DisplayCheckBox_Unchecked"/>
         <TextBox Grid.Row="2" Grid.Column="2" Height="Auto" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0 10 10 10" Name="ThresholdBox" Text="Type and press enter to set threshold" KeyDown="ThresholdBox_KeyDown"/>
     </Grid>
 </Window>

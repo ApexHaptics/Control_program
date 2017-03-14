@@ -113,5 +113,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 CalibButton.Background = System.Windows.Media.Brushes.DarkGreen;
             }
         }
+
+        private void DisplayCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Image.Source = BitmapSource.Create(
+                2,
+                2,
+                96,
+                96,
+                PixelFormats.Indexed1,
+                new BitmapPalette(new List<System.Windows.Media.Color> { Colors.Transparent }),
+                new byte[] { 0, 0, 0, 0 },
+                1);
+        }
     }
 }

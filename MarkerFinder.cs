@@ -93,7 +93,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// The angle which the marker must be tilted less than
         /// </summary>
-        private const double ThresholdMarkerAngle = Math.PI / 4;
+        private const double ThresholdMarkerAngle = Math.PI / 8;
 
         /// <summary>
         /// What the marker IDs actually correspond to
@@ -370,11 +370,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                                 default:
                                     continue;
                             }
+                            if (headPos.Count > 0) break;
+
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
 
-                            double angleOff = Math.Acos(trans_z.Data[0, 2] / VecMagnitude(trans_z));
-                            if (angleOff < ThresholdMarkerAngle) break;
+                            double angleOff = Math.Acos(transMatrix.Data[2, 2] / VecMagnitude(trans_z));
+                            if (Math.Abs(angleOff - Math.PI) > ThresholdMarkerAngle) break;
                             
                             headPos.Add(position.Data[0, 0]);
                             headPos.Add(position.Data[1, 0]);
