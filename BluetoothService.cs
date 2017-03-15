@@ -202,25 +202,27 @@
         #endregion
 
         #region Connection I/O
-        public bool Send(string message)
+        public void Send(string message)
         {
-            if (_connWtr == null)
-            {
-                //Debug.WriteLine("SEND_MSG:" + message);
-                return false;
-            }
-            try
-            {
-                _connWtr.WriteLine(message);
-                _connWtr.Flush();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show("Connection lost! (" + ex.Message + ")");
-                ConnectionCleanup();
-                return false;
-            }
+            ThreadPool.QueueUserWorkItem(delegate {
+                if (_connWtr == null)
+                {
+                    //Debug.WriteLine("SEND_MSG:" + message);
+                    return;
+                }
+                try
+                {
+                    _connWtr.WriteLine(message);
+                    _connWtr.Flush();
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show("Connection lost! (" + ex.Message + ")");
+                    ConnectionCleanup();
+                    return;
+                    }
+            }, null);
         }
 
         private void ReadMessagesToEnd_Runner(object state)

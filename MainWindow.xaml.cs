@@ -224,28 +224,30 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             List<double> robPos = new List<double>();
             List<double> robRotMatrix = new List<double>();
             double deltaT = 0;
-            int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, headPos, headRotMatrix, robPos, robRotMatrix);
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate {
+                int markerCount = finder.FindMarkers(e, idList, rotationList, translationList, ref deltaT, headPos, headRotMatrix, robPos, robRotMatrix);
 
-            if (markerCount == 0 || (headPos.Count == 0 && robPos.Count == 0)) return;
+                if (markerCount == 0 || (headPos.Count == 0 && robPos.Count == 0)) return;
 
-            string stringToSend = "MLoc," + (int)deltaT + ",";
+                string stringToSend = "MLoc," + (int)deltaT + ",";
 
-            if (headPos.Count != 0)
-            {
-                stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", headRotMatrix) + ",";
-            }
-            if (robPos.Count != 0)
-            {
-                stringToSend = stringToSend + "ROB," + String.Join(",", robPos) + "," + String.Join(",", robRotMatrix) + ",";
-                calibRobPos = new Matrix<double>(robPos.ToArray());
-                calibRobRotMatrix = new Matrix<double>(3,3);
-                for(int i = 0; i < 9; i++)
+                if (headPos.Count != 0)
                 {
-                    calibRobRotMatrix.Data[i / 3, i % 3] = robRotMatrix[i];
+                    stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", headRotMatrix) + ",";
                 }
-            }
+                if (robPos.Count != 0)
+                {
+                    stringToSend = stringToSend + "ROB," + String.Join(",", robPos) + "," + String.Join(",", robRotMatrix) + ",";
+                    calibRobPos = new Matrix<double>(robPos.ToArray());
+                    calibRobRotMatrix = new Matrix<double>(3,3);
+                    for(int i = 0; i < 9; i++)
+                    {
+                        calibRobRotMatrix.Data[i / 3, i % 3] = robRotMatrix[i];
+                    }
+                }
 
-            bluetoothService.Send(stringToSend);
+                bluetoothService.Send(stringToSend);
+            }, null);
         }
 
         /// <summary>
@@ -350,6 +352,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 lastPosSent = new DateTime(0);
                 stringToSend = stringToSend + "0,0,0,0,";
                 bluetoothService.Send(stringToSend);
+                return;
             }
 
             DateTime tempNow = DateTime.Now;

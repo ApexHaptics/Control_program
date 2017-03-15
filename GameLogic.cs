@@ -139,24 +139,25 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void Comms_enabledStateUpdated(bool isEnabled)
         {
             System.Windows.Media.Brush buttonColor;
-            
-            if (isEnabled)
-            {
-                buttonColor = System.Windows.Media.Brushes.DarkGreen;
-            }
-            else
-            {
-                Stop();
-                this.gameThread = new Thread(this.GameLoop);
-                buttonColor = System.Windows.Media.Brushes.DarkGray;
-            }
 
-            Action a = delegate {
-                gameButton.Content = "Start Game";
-                gameButton.Background = buttonColor;
-                gameButton.IsEnabled = isEnabled;
-            };
-            gameButton.Dispatcher.Invoke(a);
+            ThreadPool.QueueUserWorkItem(delegate {
+                if (isEnabled)
+                {
+                    buttonColor = System.Windows.Media.Brushes.DarkGreen;
+                }
+                else
+                {
+                    Stop();
+                    this.gameThread = new Thread(this.GameLoop);
+                    buttonColor = System.Windows.Media.Brushes.DarkGray;
+                }
+                
+                gameButton.Dispatcher.BeginInvoke(new Action(() => {
+                    gameButton.Content = "Start Game";
+                    gameButton.Background = buttonColor;
+                    gameButton.IsEnabled = isEnabled;
+                }));
+            }, null);
         }
 
         /// <summary>
@@ -165,6 +166,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void GameButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             _continue = true;
+            skipInteraction = false;
             if (!gameThread.IsAlive)
             {
                 this.gameThread.Start();
@@ -231,12 +233,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 if (!_continue) return;
 
                 // Step 5: Wait 10s or for button pressed
-                Action a = delegate {
+                gameButton.Dispatcher.BeginInvoke(new Action(() => {
                     gameButton.Content = "Skip";
                     gameButton.IsEnabled = true;
                     gameButton.Background = System.Windows.Media.Brushes.DarkRed;
-                };
-                gameButton.Dispatcher.Invoke(a);
+                }));
                 for (int i = 0; i < 20; i++)
                 {
                     if (skipInteraction) break;
@@ -245,12 +246,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                 // Wait over. Prepare for next loop
                 skipInteraction = false;
-                a = delegate {
+                gameButton.Dispatcher.BeginInvoke(new Action(() => {
                     gameButton.Content = "In progress";
                     gameButton.IsEnabled = false;
                     gameButton.Background = System.Windows.Media.Brushes.DarkGray;
-                };
-                gameButton.Dispatcher.Invoke(a);
+                }));
                 this.isInteractable = false;
             }
         }
@@ -300,6 +300,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void Stop()
         {
             _continue = false;
+            skipInteraction = true;
+            this.isInteractable = false;
             if (gameThread != null && gameThread.IsAlive)
             {
                 positionQueue.Add(null);

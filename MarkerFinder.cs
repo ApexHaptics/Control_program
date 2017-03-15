@@ -199,7 +199,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 p.AdaptiveThreshWinSizeMin = 90;
                 p.AdaptiveThreshWinSizeMax = 90;
                 Bitmap frameBitmap = ImageToBitmap(frame);
-                colourWindow.setImageBitmapSource(frameBitmap);
+                colourWindow.setImageBitmapSource((Bitmap)frameBitmap.Clone());
                 frameBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX); // The Kinect sems to flip the image
                 Image<Bgr, byte> imageFromKinect = new Image<Bgr, byte>(frameBitmap);
 
@@ -216,10 +216,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 if (ids.Size == 0)
                 {
                     // Clear the screen
-                    using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
+                    colourWindow.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
-                    }
+                        using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
+                        {
+                            dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
+                        }
+                    }));
                     return 0;
                 }
 
@@ -397,30 +400,33 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 }
 
                 // Draw the markers
-                using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
+                colourWindow.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
-                    for (int i = 0; i < cornersArray.Length; i++)
+                    using (DrawingContext dc = colourWindow.markerDrawingGroup.Open())
                     {
-                        if (!Enum.IsDefined(typeof(MarkerTypes), ids[i])) continue;
-
-                        PointF[] markerArray = cornersArray[i];
-                        for (int j = 0; j < markerArray.Length; j++)
+                        dc.DrawRectangle(System.Windows.Media.Brushes.Transparent, null, new Rect(0.0, 0.0, RenderWidth, RenderHeight));
+                        for (int i = 0; i < cornersArray.Length; i++)
                         {
-                            // From front view, top right = blue = markerarray[0]. Rest are CCW
-                            System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[j].X/2, (int)markerArray[j].Y/2);
-                            dc.DrawEllipse(
-                                this.cornerBrushes[j],
-                                null,
-                                cornerPoint,
-                                CornerThickness,
-                                CornerThickness);
+                            if (!Enum.IsDefined(typeof(MarkerTypes), idList[i])) continue;
 
-                            // Redo mirroring
-                            markerArray[j].X = cImgWidth - markerArray[j].X;
+                            PointF[] markerArray = cornersArray[i];
+                            for (int j = 0; j < markerArray.Length; j++)
+                            {
+                                // Redo mirroring
+                                markerArray[j].X = cImgWidth - markerArray[j].X;
+
+                                // From front view, top right = blue = markerarray[0]. Rest are CCW
+                                System.Windows.Point cornerPoint = new System.Windows.Point((int)markerArray[j].X / 2, (int)markerArray[j].Y / 2);
+                                dc.DrawEllipse(
+                                    this.cornerBrushes[j],
+                                    null,
+                                    cornerPoint,
+                                    CornerThickness,
+                                    CornerThickness);
+                            }
                         }
                     }
-                }
+                }));
                 return ids.Size;
             }
         }

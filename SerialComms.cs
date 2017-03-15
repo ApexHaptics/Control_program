@@ -215,36 +215,41 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public SerialComms(Button enableButton)
         {
             this.enableButton = enableButton;
-            String portName = FindDevicePort();
-            if(String.IsNullOrEmpty(portName))
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                Console.WriteLine("NO ATMEL DEVICE DETECTED");
-                return;
-            }
+                string portName;
+                do
+                {
+                    portName = FindDevicePort();
+                    Console.WriteLine("NO ATMEL DEVICE DETECTED");
+                    Thread.Sleep(5000);
+                } while (string.IsNullOrEmpty(portName));
 
-            serialPort = new SerialPort();
-            serialPort.PortName = portName;
-            serialPort.BaudRate = baudRate;
-            serialPort.ReadTimeout = 6000;
-            serialPort.WriteTimeout = 1500;
-            // This is similar to extended ascii and will allow us to access all 256 values
-            serialPort.Encoding = Encoding.GetEncoding(437);
-            try {
-                serialPort.Open();
-            }
-            catch(Exception e)
-            {
-                Console.WriteLine("COULDN'T OPEN SERIAL PORT: " + e.Message);
-                return;
-            }
+                    serialPort = new SerialPort();
+                serialPort.PortName = portName;
+                serialPort.BaudRate = baudRate;
+                serialPort.ReadTimeout = 6000;
+                serialPort.WriteTimeout = 1500;
+                // This is similar to extended ascii and will allow us to access all 256 values
+                serialPort.Encoding = Encoding.GetEncoding(437);
+                try
+                {
+                    serialPort.Open();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("COULDN'T OPEN SERIAL PORT: " + e.Message);
+                    return;
+                }
 
-            heartbeatTimer = new Timer(HeartbeatTimerExpiry);
-            heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
+                heartbeatTimer = new Timer(HeartbeatTimerExpiry);
+                heartbeatTimer.Change(heartbeatDelay, heartbeatDelay);
 
-            readThread = new Thread(ReadThread);
-            readThread.Start();
-            writeThread = new Thread(WriteThread);
-            writeThread.Start();
+                readThread = new Thread(ReadThread);
+                readThread.Start();
+                writeThread = new Thread(WriteThread);
+                writeThread.Start();
+            });
         }
 
         /// <summary>
@@ -375,13 +380,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 buttonString = "Enable Controller";
                 buttonColor = System.Windows.Media.Brushes.DarkGreen;
             }
-
-            Action a = delegate {
+            
+            enableButton.Dispatcher.BeginInvoke(new Action(() => {
                 enableButton.Content = buttonString;
                 enableButton.Background = buttonColor;
                 enableButton.IsEnabled = true;
-            };
-            enableButton.Dispatcher.Invoke(a);
+            }));
         }
 
         /// <summary>
