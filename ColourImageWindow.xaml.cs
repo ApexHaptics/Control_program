@@ -50,10 +50,16 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="bitmap"></param>
         public void setImageBitmapSource(Bitmap bitmap)
         {
-            Dispatcher.BeginInvoke(new Action(() => {
-                if (!(bool)DisplayCheckBox.IsChecked) return;
-                Image.Source = BitmapToImageSource(bitmap);
-            }));
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                ImageSource imSrc = BitmapToImageSource(bitmap);
+                imSrc.Freeze();
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!(bool)DisplayCheckBox.IsChecked) return;
+                    Image.Source = imSrc;
+                }));
+            });
         }
 
         /// <summary>

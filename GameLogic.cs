@@ -68,7 +68,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// If true we should skip the current interaction phase
         /// </summary>
-        private bool skipInteraction = false;
+        private ManualResetEvent skipInteraction = new ManualResetEvent(false);
 
         /// <summary>
         /// A queue of arrived positions to compare with the demanded position
@@ -166,14 +166,14 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void GameButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             _continue = true;
-            skipInteraction = false;
             if (!gameThread.IsAlive)
             {
+                skipInteraction.Reset();
                 this.gameThread.Start();
             }
             else
             {
-                skipInteraction = true;
+                skipInteraction.Set();
             }
             gameButton.Content = "In progress";
             gameButton.IsEnabled = false;
@@ -238,14 +238,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     gameButton.IsEnabled = true;
                     gameButton.Background = System.Windows.Media.Brushes.DarkRed;
                 }));
-                for (int i = 0; i < 20; i++)
-                {
-                    if (skipInteraction) break;
-                    Thread.Sleep(500);
-                }
+
+                skipInteraction.WaitOne(10000);
 
                 // Wait over. Prepare for next loop
-                skipInteraction = false;
+                skipInteraction.Reset();
                 gameButton.Dispatcher.BeginInvoke(new Action(() => {
                     gameButton.Content = "In progress";
                     gameButton.IsEnabled = false;
@@ -300,11 +297,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         public void Stop()
         {
             _continue = false;
-            skipInteraction = true;
+            skipInteraction.Set();
             this.isInteractable = false;
             if (gameThread != null && gameThread.IsAlive)
             {
-                positionQueue.Add(null);
+                positionQueue.Add(null); // Sentinel value
                 gameThread.Join();
                 positionQueue = new BlockingCollection<double[]>(new ConcurrentQueue<double[]>());
             }

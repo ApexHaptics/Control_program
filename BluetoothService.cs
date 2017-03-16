@@ -1,4 +1,5 @@
-﻿namespace Microsoft.Samples.Kinect.SkeletonBasics
+﻿// Code taken from 32Feet.net "Chat2Device" sample
+namespace Microsoft.Samples.Kinect.SkeletonBasics
 {
     using InTheHand.Net;
     using InTheHand.Net.Sockets;
@@ -74,9 +75,9 @@
 
         void BluetoothConnect(BluetoothAddress addr)
         {
-            var cli = new BluetoothClient();
             try
             {
+                var cli = new BluetoothClient();
                 cli.Connect(addr, OurServiceClassId);
                 var peer = cli.GetStream();
                 SetConnection(peer, true, cli.RemoteEndPoint);
@@ -221,7 +222,7 @@
                     System.Windows.MessageBox.Show("Connection lost! (" + ex.Message + ")");
                     ConnectionCleanup();
                     return;
-                    }
+                }
             }, null);
         }
 

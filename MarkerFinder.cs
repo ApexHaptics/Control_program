@@ -300,9 +300,9 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                                     break;
                                 case MarkerTypes.EndEffector:
                                     // TODO: Find end effector offset
-                                    offset[0, 0] = 0;
-                                    offset[1, 0] = 0;
-                                    offset[2, 0] = 0;
+                                    offset[0, 0] = 0.03;
+                                    offset[1, 0] = 0.516;
+                                    offset[2, 0] = -0.06;
                                     break;
                                 default:
                                     continue;

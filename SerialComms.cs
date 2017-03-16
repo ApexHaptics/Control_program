@@ -60,7 +60,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// The amount of milliseconds to wait before the heartbeat timer expires
         /// For reference the heartbeats should arrive every 1000ms
         /// </summary>
-        const int heartbeatDelay = 5000;
+        const int heartbeatDelay = 2000;
 
         /// <summary>
         /// If false, the read and write threads will terminate
@@ -299,7 +299,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         if (!enableButton.IsEnabled) break;
                         enableButton.IsEnabled = false;
                         unsentArrays.Add(ConstructSendMessage('\0', 'E', new byte[0]));
-                        pendingActions.Add(enablerHandler);
+                        pendingActions.Add(enabledHandler);
                         enableButton.Background = System.Windows.Media.Brushes.DarkGray;
                         break;
                     case "D":
@@ -307,7 +307,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                         if (!enableButton.IsEnabled) break;
                         enableButton.IsEnabled = false;
                         unsentArrays.Add(ConstructSendMessage('\0', 'D', new byte[0]));
-                        pendingActions.Add(enablerHandler);
+                        pendingActions.Add(disabledHandler);
                         enableButton.Background = System.Windows.Media.Brushes.DarkGray;
                         break;
                     default:
@@ -360,30 +360,33 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         }
 
         /// <summary>
-        /// Handler for enable/disable commands
+        /// Handler for enable command returning
         /// </summary>
         /// <param name="b">Unused</param>
-        void enablerHandler(byte[] b)
+        void enabledHandler(byte[] b)
         {
-            string buttonString;
-            System.Windows.Media.Brush buttonColor;
-            robotIsEnabled = !robotIsEnabled;
+            robotIsEnabled = true;
+            enabledStateUpdated(true);
 
-            enabledStateUpdated(robotIsEnabled);
-            if(robotIsEnabled)
-            {
-                buttonString = "Disable Controller";
-                buttonColor = System.Windows.Media.Brushes.DarkRed;
-            }
-            else
-            {
-                buttonString = "Enable Controller";
-                buttonColor = System.Windows.Media.Brushes.DarkGreen;
-            }
-            
             enableButton.Dispatcher.BeginInvoke(new Action(() => {
-                enableButton.Content = buttonString;
-                enableButton.Background = buttonColor;
+                enableButton.Content = "Disable Controller";
+                enableButton.Background = System.Windows.Media.Brushes.DarkRed;
+                enableButton.IsEnabled = true;
+            }));
+        }
+
+        /// <summary>
+        /// Handler for disable commands
+        /// </summary>
+        /// <param name="b">Unused</param>
+        void disabledHandler(byte[] b)
+        {
+            robotIsEnabled = false;
+            enabledStateUpdated(false);
+
+            enableButton.Dispatcher.BeginInvoke(new Action(() => {
+                enableButton.Content = "Enable Controller";
+                enableButton.Background = System.Windows.Media.Brushes.DarkGreen;
                 enableButton.IsEnabled = true;
             }));
         }
