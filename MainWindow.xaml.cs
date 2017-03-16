@@ -236,12 +236,21 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 {
                     robPos[0] = -robPos[0];
                     robPos[1] = robPos[1];
-                    stringToSend = stringToSend + "ROB," + String.Join(",", robPos) + "," + String.Join(",", robRotMatrix) + ",";
+                    List<double> robRotMatrixTransform = new List<double>();
+                    for (int i = 0; i < robRotMatrix.Count; i++)
+                    {
+                        if (i < 6) { // First two rows must be negative
+                            robRotMatrixTransform.Add(-robRotMatrix[i]);
+                        } else {
+                            robRotMatrixTransform.Add(robRotMatrix[i]);
+                        }
+                    }
+                    stringToSend = stringToSend + "ROB," + String.Join(",", robPos) + "," + String.Join(",", robRotMatrixTransform) + ",";
                     calibRobPos = new Matrix<double>(robPos.ToArray());
                     calibRobRotMatrix = new Matrix<double>(3,3);
                     for(int i = 0; i < 9; i++)
                     {
-                        calibRobRotMatrix.Data[i / 3, i % 3] = robRotMatrix[i];
+                        calibRobRotMatrix.Data[i / 3, i % 3] = robRotMatrixTransform[i];
                     }
                 }
                 
@@ -345,10 +354,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             Matrix<double> positionMat = new Matrix<double>(3,1);
             positionMat.Data[0, 0] = -position[1];
             positionMat.Data[1, 0] = position[2] + robotOriginVerticalOffset;
-            positionMat.Data[2, 0] = position[0];
+            positionMat.Data[2, 0] = -position[0];
             positionMat = calibRobPos + calibRobRotMatrix * positionMat;
 
-            stringToSend = stringToSend + positionMat.Data[0, 0] + "," + positionMat.Data[1,0] + "," + positionMat.Data[2,0] + ",";
+            double xToSend = positionMat.Data[0, 0];
+            double yToSend = positionMat.Data[1, 0] - calibRobPos[1, 0];
+            double zToSend = positionMat.Data[2, 0];
+            stringToSend = stringToSend + xToSend + "," + yToSend + "," + zToSend + ",";
             Console.WriteLine(stringToSend);
             bluetoothService.Send(stringToSend);
         }

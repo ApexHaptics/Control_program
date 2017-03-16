@@ -165,7 +165,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 return;
             }
             _closing = false;
-            var connWtr = new StreamWriter(peerStream);
+            var connWtr = TextWriter.Synchronized(new StreamWriter(peerStream));
             connWtr.NewLine = "\r\n"; // Want CR+LF even on UNIX/Mac etc.
             _connWtr = connWtr;
             ClearScreen();

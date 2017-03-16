@@ -211,6 +211,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 z = work_z_low;
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
+                this.isInteractable = false;
                 Thread.Sleep(movementDelay);
 
                 // Step 2: Random x, y and still low z
@@ -248,7 +249,6 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     gameButton.IsEnabled = false;
                     gameButton.Background = System.Windows.Media.Brushes.DarkGray;
                 }));
-                this.isInteractable = false;
             }
         }
 
@@ -258,7 +258,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <param name="data">An integer which contains game state data</param>
         private void InformDisplayOfGameState(int data = 0)
         {
-            string stringToSend = "GStt," + data;
+            string stringToSend = "GStt," + data + ",";
             btService.Send(stringToSend);
         }
 
@@ -305,6 +305,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 gameThread.Join();
                 positionQueue = new BlockingCollection<double[]>(new ConcurrentQueue<double[]>());
             }
+            string stringToSend = "RPos,0,0,0,0,";
+            btService.Send(stringToSend);
         }
 
         /// <summary>
