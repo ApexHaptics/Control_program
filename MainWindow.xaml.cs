@@ -63,6 +63,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private DateTime lastPosSent = new DateTime(0);
 
         /// <summary>
+        /// The last head position sent
+        /// </summary>
+        private List<double> lastHeadPosSent = null;
+
+        /// <summary>
         /// Which joints we will send over bluetooth. All others ignored
         /// </summary>
         private static readonly JointType[] JointsToSend = { JointType.Head, JointType.HandLeft,
@@ -89,9 +94,10 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         Matrix<double> calibRobRotMatrix = null;
 
         /// <summary>
-        /// The vertical offset from the center of the robot to the ground
+        /// The vertical offset from the center of the robot to the ground (0.225)
+        /// and the distance from the ball joints to the interaction plate (0.034)
         /// </summary>
-        double robotOriginVerticalOffset = 0.225;
+        double robotOriginVerticalOffset = 0.259;
 
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
@@ -228,7 +234,12 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     {
                         headPos[0] = -headPos[0];
                         headPos[1] = calibRobPos[1, 0] - headPos[1];
-                        stringToSend = stringToSend + "HED," + String.Join(",", headPos) + "," + String.Join(",", headRotMatrix) + ",";
+                        stringToSend = stringToSend + "HED," + String.Join(",", headPos) + ",";
+                        if (headRotMatrix.Count > 0)
+                        {
+                            stringToSend = stringToSend + String.Join(",", headRotMatrix) + ",";
+                        }
+                        lastHeadPosSent = headPos;
                     }
                     else  if (robPos.Count == 0) return;
                 }
@@ -287,7 +298,29 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     skeletonFrame.CopySkeletonDataTo(skeletons);
                 }
             }
-            var skeletonToSend = skeletons.Where(skeleton => skeleton.TrackingState == SkeletonTrackingState.Tracked).Select(skeleton => skeleton).FirstOrDefault();
+
+            Skeleton skeletonToSend = null;
+            List<Skeleton> trackedSkeletons = skeletons.Where(skeleton => skeleton.TrackingState == SkeletonTrackingState.Tracked).ToList();
+            if(lastHeadPosSent != null)
+            {
+                foreach(Skeleton skeleton in trackedSkeletons)
+                {
+                    if(skeletonToSend == null)
+                    {
+                        skeletonToSend = skeleton;
+                        continue;
+                    }
+                    SkeletonPoint sendHead = skeletonToSend.Joints.Where(joint => joint.JointType == JointType.Head).FirstOrDefault().Position;
+                    SkeletonPoint candHead = skeleton.Joints.Where(joint => joint.JointType == JointType.Head).FirstOrDefault().Position;
+                    double sendDistSquared = Math.Pow(sendHead.X - lastHeadPosSent[0], 2) + Math.Pow(sendHead.Y - lastHeadPosSent[1], 2) +
+                        Math.Pow(sendHead.Z - lastHeadPosSent[2], 2);
+                    double candDistSquared = Math.Pow(candHead.X - lastHeadPosSent[0], 2) + Math.Pow(candHead.Y - lastHeadPosSent[1], 2) +
+                        Math.Pow(candHead.Z - lastHeadPosSent[2], 2);
+
+                    if (candDistSquared < sendDistSquared) skeletonToSend = skeleton;
+                }
+            }
+
             if (skeletonToSend != null && calibRobPos != null)
             {
                 string stringToSend = "JLoc,";
@@ -307,6 +340,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     double jointY = joint.Position.Y + calibRobPos[1,0];
                     double jointZ = joint.Position.Z;
 
+                    if (!(bool) DisplayCheckBox.IsChecked && (JointType.HandLeft == joint.JointType || JointType.HandRight == joint.JointType)) jointY = -15;
+
                     int filtersIndex = Array.IndexOf(JointsToSend, joint.JointType) * 3;
                     if (filtersIndex < 0) continue;
 
@@ -322,14 +357,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 bluetoothService.Send(stringToSend);
             }
 
-            this.renderer.RenderSkeletons(skeletons);
+            this.renderer.RenderSkeletons(skeletons, skeletonToSend);
         }
 
         /// <summary>
         /// Handle a position update from the forward kinematics
         /// </summary>
         /// <param name="position">The position of the robot</param>
-        private void kinPositionUpdated(double[] position)
+        /// <param name="force">Ignored</param>
+        private void kinPositionUpdated(double[] position, double force)
         {
             if (calibRobPos == null) return;
 

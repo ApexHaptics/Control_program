@@ -196,8 +196,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 p.DoCornerRefinement = true;
                 p.AdaptiveThreshConstant = 7;
                 p.AdaptiveThreshWinSizeStep = 2;
-                p.AdaptiveThreshWinSizeMin = 90;
-                p.AdaptiveThreshWinSizeMax = 90;
+                p.AdaptiveThreshWinSizeMin = 50;
+                p.AdaptiveThreshWinSizeMax = 50;
                 Bitmap frameBitmap = ImageToBitmap(frame);
                 colourWindow.setImageBitmapSource((Bitmap)frameBitmap.Clone());
                 frameBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX); // The Kinect sems to flip the image
@@ -284,25 +284,24 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                             switch ((MarkerTypes)ids[i])
                             {
                                 case MarkerTypes.HeadLeft:
-                                    offset[0, 0] = -0.072;
+                                    offset[0, 0] = 0.025;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.106;
+                                    offset[2, 0] = -0.100;
                                     break;
                                 case MarkerTypes.HeadCenter:
                                     offset[0, 0] = 0;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.023;
+                                    offset[2, 0] = -0.13;
                                     break;
                                 case MarkerTypes.HeadRight:
-                                    offset[0, 0] = 0.072;
+                                    offset[0, 0] = -0.025;
                                     offset[1, 0] = 0;
-                                    offset[2, 0] = -0.106;
+                                    offset[2, 0] = -0.100;
                                     break;
                                 case MarkerTypes.EndEffector:
-                                    // TODO: Find end effector offset
-                                    offset[0, 0] = -0.03;
-                                    offset[1, 0] = -0.516;
-                                    offset[2, 0] = 0.035;
+                                    offset[0, 0] = -0.046;
+                                    offset[1, 0] = -0.507;
+                                    offset[2, 0] = -0.0305;
                                     break;
                                 default:
                                     continue;
@@ -377,13 +376,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                             Matrix<double> trans_x = transMatrix.GetCol(0);
                             Matrix<double> trans_z = transMatrix.GetCol(2);
-
-                            double angleOff = Math.Acos(transMatrix.Data[2, 2] / VecMagnitude(trans_z));
-                            if (Math.Abs(angleOff - Math.PI) > ThresholdMarkerAngle) break;
                             
                             headPos.Add(position.Data[0, 0]);
                             headPos.Add(position.Data[1, 0]);
                             headPos.Add(position.Data[2, 0]);
+
+                            double angleOff = Math.Acos(transMatrix.Data[2, 2] / VecMagnitude(trans_z));
+                            if (Math.Abs(angleOff - Math.PI) > ThresholdMarkerAngle) break;
 
                             // Manual rotation matrix
                             Matrix<double> new_x_axis = Math.Cos(offset_angle) * trans_x + Math.Sin(offset_angle) * trans_z;

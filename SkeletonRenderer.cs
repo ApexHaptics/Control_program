@@ -52,6 +52,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private readonly Brush trackedJointBrush = new SolidColorBrush(Color.FromArgb(255, 68, 192, 68));
 
         /// <summary>
+        /// Brush used for drawing joints that are currently tracked
+        /// </summary>
+        private readonly Brush sentTrackedJointBrush = new SolidColorBrush(Color.FromArgb(255,128,0,128));
+
+        /// <summary>
         /// Brush used for drawing joints that are currently inferred
         /// </summary>        
         private readonly Brush inferredJointBrush = Brushes.Yellow;
@@ -86,7 +91,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Event handler for Kinect sensor's SkeletonFrameReady event
         /// </summary>
         /// <param name="skeletons">The skeleton(s) to be redered</param>
-        public void RenderSkeletons(Skeleton[] skeletons)
+        public void RenderSkeletons(Skeleton[] skeletons, Skeleton skeletonToSend)
         {
             using (DrawingContext dc = this.drawingGroup.Open())
             {
@@ -99,7 +104,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                     if (skel.TrackingState == SkeletonTrackingState.Tracked)
                     {
-                        this.DrawBonesAndJoints(skel, dc);
+                        this.DrawBonesAndJoints(skel, dc, skeletonToSend == skel);
                     }
                     else if (skel.TrackingState == SkeletonTrackingState.PositionOnly)
                     {
@@ -122,7 +127,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         /// <param name="skeleton">skeleton to draw</param>
         /// <param name="drawingContext">drawing context to draw to</param>
-        private void DrawBonesAndJoints(Skeleton skeleton, DrawingContext drawingContext)
+        private void DrawBonesAndJoints(Skeleton skeleton, DrawingContext drawingContext, bool isSkeletonToSend)
         {
             // Render Torso
             this.DrawBone(skeleton, drawingContext, JointType.Head, JointType.ShoulderCenter);
@@ -160,7 +165,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
 
                 if (joint.TrackingState == JointTrackingState.Tracked)
                 {
-                    drawBrush = this.trackedJointBrush;
+                    drawBrush = isSkeletonToSend ? this.sentTrackedJointBrush : this.trackedJointBrush;
                 }
                 else if (joint.TrackingState == JointTrackingState.Inferred)
                 {

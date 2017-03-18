@@ -26,14 +26,25 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private const float work_z_mid = 0.92f;
 
         /// <summary>
-        /// The distance before we consider the target "reached" (currently 0.05^2)
+        /// The top z of our workspace
         /// </summary>
+        private const float work_z_top = 1.04f;
+
+        /// <summary>
+        /// The distance before we consider the target "reached"
+        /// </summary>
+        private const double dist_thresh = 0.05;
         private const double dist_thresh_square = 0.0025;
 
         /// <summary>
         /// The epsilon below which the velocity is considered settled (0.01 m/s)^2
         /// </summary>
         private const double epsilon_square = 0.0001;
+
+        /// <summary>
+        /// The epsilon below which we consider interaction to have stopped
+        /// </summary>
+        private const double epsilon_force = 0.1;
 
         /// <summary>
         /// How long to delay after certain end effector movements
@@ -71,6 +82,11 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private ManualResetEvent skipInteraction = new ManualResetEvent(false);
 
         /// <summary>
+        /// If true the user has stopped interacting
+        /// </summary>
+        private ManualResetEvent stillInteracting = new ManualResetEvent(false);
+
+        /// <summary>
         /// A queue of arrived positions to compare with the demanded position
         /// </summary>
         BlockingCollection<double[]> positionQueue = new BlockingCollection<double[]>(new ConcurrentQueue<double[]>());
@@ -95,8 +111,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// </summary>
         float[][] impedanceValues = new float[][]
         {
-            new float[]{10, 60, 0},
-            new float[]{0, 50, 500},
+            new float[]{40, 120, 0},
+            new float[]{20, 50, 300},
             new float[]{10, 40, 150},
         };
 
@@ -169,11 +185,13 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
             if (!gameThread.IsAlive)
             {
                 skipInteraction.Reset();
+                stillInteracting.Reset();
                 this.gameThread.Start();
             }
             else
             {
                 skipInteraction.Set();
+                stillInteracting.Set();
             }
             gameButton.Content = "In progress";
             gameButton.IsEnabled = false;
@@ -184,9 +202,21 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// Handler for new kinematic position data
         /// </summary>
         /// <param name="position">The end effector position</param>
-        private void Comms_kinPosUpdated(double[] position)
+        /// <param name="force">Ignored</param>
+        private void Comms_kinPosUpdated(double[] position, double force)
         {
             positionQueue.Add(position);
+            if(currentImpendenceIndex == 0)
+            {
+                if(position[2] - work_z_low < dist_thresh)
+                {
+                    skipInteraction.Set();
+                }
+            }
+            if(Math.Abs(force) < epsilon_force)
+            {
+                stillInteracting.Set();
+            }
         }
 
         /// <summary>
@@ -221,15 +251,15 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                 Thread.Sleep(movementDelay);
 
                 // Step 3: Set impedance
+                currentImpendenceIndex = (currentImpendenceIndex + 1) % impedanceValues.Length;
                 comms.SetImpedance(impedanceValues[currentImpendenceIndex][0],
                     impedanceValues[currentImpendenceIndex][1],
                     impedanceValues[currentImpendenceIndex][2]);
                 InformDisplayOfGameState(currentImpendenceIndex);
-                currentImpendenceIndex = (currentImpendenceIndex + 1) % impedanceValues.Length;
                 this.isInteractable = true;
 
                 // Step 4: Interaction z, previous x,y
-                z = work_z_mid;
+                z = (currentImpendenceIndex == 0) ? work_z_top : work_z_mid;
                 MoveToPoint(x, y, z);
                 if (!_continue) return;
 
@@ -240,15 +270,18 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     gameButton.Background = System.Windows.Media.Brushes.DarkRed;
                 }));
 
-                skipInteraction.WaitOne(10000);
+                skipInteraction.Reset();
+                skipInteraction.WaitOne(10000); // Wait 10s for the user to find it
+                stillInteracting.Reset();
+                stillInteracting.WaitOne();
 
                 // Wait over. Prepare for next loop
-                skipInteraction.Reset();
                 gameButton.Dispatcher.BeginInvoke(new Action(() => {
                     gameButton.Content = "In progress";
                     gameButton.IsEnabled = false;
                     gameButton.Background = System.Windows.Media.Brushes.DarkGray;
                 }));
+                InformDisplayOfGameState(-1); // Sentinel value
             }
         }
 
@@ -298,6 +331,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         {
             _continue = false;
             skipInteraction.Set();
+            stillInteracting.Set();
             this.isInteractable = false;
             if (gameThread != null && gameThread.IsAlive)
             {
@@ -317,7 +351,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         private void MakeRandomCirclePoints(out float x, out float y)
         {
             double sqrt_r = Math.Sqrt(rand.NextDouble())*work_radius;
-            double angle = rand.NextDouble() * 2 * Math.PI;
+            //double angle = rand.NextDouble() * 2 * Math.PI;
+            double angle = rand.NextDouble() * 2 / 3 * Math.PI - (Math.PI / 4);
             x = (float)(sqrt_r * Math.Cos(angle));
             y = (float)(sqrt_r * Math.Sin(angle));
         }

@@ -70,7 +70,7 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
         /// <summary>
         /// A delegate type for handling a kinematic position update from the robot
         /// </summary>
-        public delegate void KinPosUpdateHandler(double[] position);
+        public delegate void KinPosUpdateHandler(double[] position, double force);
 
         /// <summary>
         /// The event fired when a new kinematic position is sent from the robot
@@ -522,7 +522,8 @@ namespace Microsoft.Samples.Kinect.SkeletonBasics
                     float theta2 = parseFloatBytes(packet.data, 4);
                     float theta3 = parseFloatBytes(packet.data, 8);
                     double[] position = Physics.physics_fkin(theta1, theta2, theta3);
-                    kinPosUpdated(position);
+                    float force = parseFloatBytes(packet.data, 12);
+                    kinPosUpdated(position, force);
                     break;
                 default:
                     Console.WriteLine("Unknown {0} packet rec. Tag:{1}, ID:{2}, data:{3}",
